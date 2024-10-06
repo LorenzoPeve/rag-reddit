@@ -5,8 +5,6 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 
-load_dotenv(override=True)
-
 REDDIT = praw.Reddit(
     client_id=os.getenv("REDDIT_CLIENT_ID"),
     client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
