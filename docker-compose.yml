@@ -1,28 +1,31 @@
-version: "3.8"
+version: '3.8'
+
 services:
   db:
-    image: postgres
-    container_name: local_pgdb
-    restart: always
-    ports:
-      - "5432:5432"
+    container_name: postgres-resume-dev
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
+      POSTGRES_DB: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123
     volumes:
-      - local_pgdata:/var/lib/postgresql/data
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin4_container
-    restart: always
+      - postgres-data:/var/lib/postgresql/data
     ports:
-      - "8888:80"
-    environment:
+      - "5432:5432"
+
+  pgadmin:  
+    image: dpage/pgadmin4  
+    container_name: pgadmin4_container  
+    restart: always  
+    ports:  
+      - "8888:80"  
+    environment:  
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-
-volumes:
-  local_pgdata:
+    volumes:  
+      - pgadmin-data:/var/lib/pgadmin  
+  
+volumes:  
+  postgres-data:
   pgadmin-data:
