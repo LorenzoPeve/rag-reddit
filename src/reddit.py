@@ -65,7 +65,14 @@ def get_top_posts(subreddit: str, limit: int = 100, t: str = "month") -> list[di
             f"Failed to get top posts from {subreddit}. Error: {response.text}"
         )
 
-    return response.json()["data"]["children"]
+    r = response.json()["data"]["children"]
+
+    # Extract the post data from the response for each post
+    out = []
+    for post in r:
+        assert post["kind"] == "t3"
+        out.append(post["data"])
+    return out
 
 
 def traverse_comments(comment: praw.models.Comment, collected_comments: list):
@@ -76,11 +83,15 @@ def traverse_comments(comment: praw.models.Comment, collected_comments: list):
     Returns:
         None: The function modifies the collected_comments list in place.
     """
+    # Skip comments made by the bot
+    if "I am a bot, and this action was performed automatically" in comment.body:
+        return
+
     # Add the current comment's body to the list
     discard = [
         "following",
         "following!",
-        '+1',
+        "+1",
         "[deleted]",
         "deleted",
     ]
