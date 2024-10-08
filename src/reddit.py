@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 import praw
 import requests
@@ -71,6 +70,29 @@ def get_top_posts(subreddit: str, limit: int = 100, t: str = "month") -> list[di
         assert post["kind"] == "t3"
         out.append(post["data"])
     return out
+
+
+def get_post_from_url(url: str) -> dict:
+    """
+    Fetches a Reddit post using the post's URL. The URL must be in the format:
+    /r/{subreddit}/{id}/{title}/
+    """
+    assert url.startswith("/r/")
+
+    response = requests.get(
+        f"https://oauth.reddit.com/{url}",
+        headers={
+            "Authorization": f"bearer {get_auth_token()}",
+            "User-Agent": os.getenv("USER_AGENT"),
+        },
+    )
+
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to get top posts from {response.url}. Error: {response.text}"
+        )
+
+    return response.json()
 
 
 def traverse_comments(comment: praw.models.Comment, collected_comments: list):
