@@ -1,7 +1,9 @@
 import os
 import praw
+import re
 import requests
 from requests.auth import HTTPBasicAuth
+import unicodedata
 
 
 REDDIT = praw.Reddit(
@@ -95,6 +97,19 @@ def get_post_from_url(url: str) -> dict:
     return response.json()
 
 
+def sanitize_text(text):
+    """
+    Sanitizes text by removing special characters, html tags, and normalizing
+    whitespace.
+    """
+    text = re.sub(r"\s+", " ", text).strip()  # normalize whitespace
+    text = re.sub(r"\n", " ", text).strip()
+    text = re.sub(r"<.*?>", "", text)  # remove html tags
+    text = unicodedata.normalize("NFD", text)
+    text = text.encode("ascii", "ignore").decode("utf-8")
+    return text
+
+
 def traverse_comments(comment: praw.models.Comment, collected_comments: list):
     """
     Recursively traverses a comment tree and collects the comment bodies into a list.
@@ -117,7 +132,7 @@ def traverse_comments(comment: praw.models.Comment, collected_comments: list):
     ]
 
     if comment.body.lower() not in discard:
-        collected_comments.append(comment.body)
+        collected_comments.append(sanitize_text(comment.body))
 
     # Recursively traverse replies if they exist
     for reply in comment.replies:
