@@ -110,19 +110,30 @@ def sanitize_text(text):
     return text
 
 
-def traverse_comments(comment: praw.models.Comment, collected_comments: list):
+def traverse_comments(
+    comment: praw.models.Comment,
+    collected_comments: list,
+    depth: int = 0,
+    max_depth: int = 4,
+):
     """
-    Recursively traverses a comment tree and collects the comment bodies into a list.
+    Recursively traverses a comment tree and collects the comment bodies into a list up to a specified depth.
         comment (praw.models.Comment): The current Reddit comment object.
         collected_comments (list): A list to collect the comments' body text.
+        depth (int): The current depth level of recursion (default is 0).
+        max_depth (int): The maximum depth to traverse (default is 4).
     Returns:
         None: The function modifies the collected_comments list in place.
     """
+    # Stop if we have exceeded the maximum depth
+    if depth > max_depth:
+        return
+
     # Skip comments made by the bot
     if "I am a bot, and this action was performed automatically" in comment.body:
         return
 
-    # Add the current comment's body to the list
+    # Add the current comment's body to the list if it's not in the discard list
     discard = [
         "following",
         "following!",
@@ -134,9 +145,9 @@ def traverse_comments(comment: praw.models.Comment, collected_comments: list):
     if comment.body.lower() not in discard:
         collected_comments.append(sanitize_text(comment.body))
 
-    # Recursively traverse replies if they exist
+    # Recursively traverse replies if they exist and we haven't exceeded max_depth
     for reply in comment.replies:
-        traverse_comments(reply, collected_comments)
+        traverse_comments(reply, collected_comments, depth + 1, max_depth)
 
 
 def get_all_comments_in_post(submission_id: str) -> str:

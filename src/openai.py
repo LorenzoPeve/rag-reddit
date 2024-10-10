@@ -1,9 +1,11 @@
 import os
+from openai import OpenAI
 import tiktoken
 
 ENCODER = os.getenv("OPENAI_ENCODER")
-MODEL = os.getenv('OPENAI_EMBEDDING_MODEL')
+EMBEDDING_MODEL_NAME = os.getenv('OPENAI_EMBEDDING_MODEL')
 TOKEN_LIMIT = int(os.getenv('OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT'))
+OPENAI_CLIENT = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 def num_tokens_from_string(string: str) -> int:
     """Returns the number of tokens in a text string."""
@@ -27,3 +29,12 @@ def check_token_limit(string: str) -> int:
     num_tokens = num_tokens = num_tokens_from_string(string)
     if num_tokens > TOKEN_LIMIT:
         raise ValueError(f"Input text exceeds token limit of {TOKEN_LIMIT}. Found {num_tokens} tokens.")
+    
+def get_embedding(string: str) -> list[float]:
+    """Get the embedding for a string using the specified OpenAI client."""
+    response =OPENAI_CLIENT.embeddings.create(
+        model=EMBEDDING_MODEL_NAME,
+        input=string
+    )
+
+    return response.data[0].embedding

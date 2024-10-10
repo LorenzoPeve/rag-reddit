@@ -2,9 +2,7 @@ import hashlib
 import os
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, declarative_base,Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 
 from src import reddit, openai
@@ -105,17 +103,12 @@ def insert_reddit_post(p: dict) -> None:
     body = p["title"] + p["selftext"] + comments
     content_hash = hashlib.md5(body.encode()).hexdigest()
 
-    # Manipulate description
-    text = p["selftext"]
-    if len(text) == 0:
-        text = None
-
     # Insert the post into the database
     with Session(engine) as session:
         post = RedditPosts(
             id=p["id"],
             title=p["title"],
-            description=text,
+            description=p["selftext"],
             upvotes=p["ups"],
             downvotes=p["downs"],
             tag=p["link_flair_text"],
@@ -127,7 +120,7 @@ def insert_reddit_post(p: dict) -> None:
         session.commit()
 
 
-def insert_documents_from_comments_body(post_id: str) -> None:
+def insert_documents_from_comments_body(post_id: str, chunk_size: int, chunk_overlap: int) -> None:
     """
     Inserts the comments body into the database. If the comments body exceeds
     the token limit, the body is split into chunks and each chunk is inserted
@@ -138,47 +131,39 @@ def insert_documents_from_comments_body(post_id: str) -> None:
     Returns:
         None
     """
-    chunk_size = os.getenv("CHUNK_SIZE")
-    chunk_overlap = os.getenv("CHUNK_OVERLAP")
     engine = get_db_engine()
-    comments = reddit.get_all_comments_in_post(post_id)
 
     with Session(engine) as session:
         post = session.query(RedditPosts).filter_by(id=post_id).first()
 
+    # Generate entire document body as title + description + comments
+    comments = reddit.get_all_comments_in_post(post_id)
     document_body = f"{post.title}\n{post.description}\n{comments}"
-    tokens = openai.get_tokens_from_string(document_body)
 
-    if len(tokens) <= chunk_size:
+    # Split the document body into chunks
+    tokens = openai.get_tokens_from_string(document_body)
+    num_chunks = (len(tokens) + chunk_size - 1) // chunk_size  # Calculate the number of chunks
+
+    for chunk_id in range(1, num_chunks + 1):
+        start = (chunk_id - 1) * (chunk_size - chunk_overlap)
+        end = start + chunk_size
+        chunk_content = openai.get_string_from_tokens(tokens[start:end])
+
+        # Prepend the title to all chunks except the first one
+        if chunk_id != 1:
+            chunk_content = f"{post.title}\n{chunk_content}"
+
+        # Insert the document chunk into the database
         with Session(engine) as session:
             d = Documents(
-                id=f"{post_id}_1", post_id=post_id, chunk_id=1, content=document_body
+                id=f"{post_id}_{chunk_id}",
+                post_id=post_id,
+                chunk_id=chunk_id,
+                content=chunk_content,
+                embedding=openai.get_embedding(chunk_content),
             )
             session.add(d)
             session.commit()
-    else:
-        start = 0
-        end = chunk_size
-        chunk_id = 1
-
-        while end < len(tokens):
-            chunk_tokens = tokens[start:end]
-
-            # Insert the document chunk into the database
-            with Session(engine) as session:
-                d = Documents(
-                    id=f"{post_id}_{chunk_id}",
-                    post_id=post_id,
-                    chunk_id=start,
-                    content=openai.get_string_from_tokens(chunk_tokens),
-                )
-                session.add(d)
-                session.commit()
-
-            # Update start and end with overlap
-            start += chunk_size - chunk_overlap
-            end += chunk_size - chunk_overlap
-            chunk_id += 1
 
 
 def is_post_modified(post_id: str) -> bool:
