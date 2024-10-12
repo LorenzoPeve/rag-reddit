@@ -1,7 +1,7 @@
 import hashlib
 import os
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey, select
+from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey
 from sqlalchemy.orm import Session, declarative_base, Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 
