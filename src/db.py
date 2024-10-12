@@ -1,11 +1,13 @@
 import hashlib
 import os
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey
-from sqlalchemy.orm import Session, declarative_base,Mapped, mapped_column
+from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey, select
+from sqlalchemy.orm import Session, declarative_base, Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 
 from src import reddit, openai
+import psycopg2
+from psycopg2 import extensions
 
 
 Base = declarative_base()
@@ -42,18 +44,63 @@ class Documents(Base):
         return f"<Document(id={self.id}, post_id={self.post_id}, chunk_id={self.chunk_id})>"
 
 
+def get_cursor():
+    """
+    Connects to the PostgreSQL database using psycopg2 and returns the connection and cursor objects.
+    The connection parameters are retrieved from environment variables.
+
+    Returns:
+        conn: The connection object to the PostgreSQL database.
+        cur: The cursor object for executing SQL queries.
+    """
+    conn = psycopg2.connect(
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+    )
+    return conn.cursor()
+
+
 def init_schema() -> None:
     engine = get_db_engine()
 
     with Session(engine) as session:
+        # Drop and recreate the schema
         session.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
         session.execute(text("CREATE SCHEMA public;"))
+        
+        # Create the vector extension (if not exists)
         session.execute(
             text("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;")
         )
+        session.commit()  # Commit schema changes before creating tables
+
+    # Create all tables from metadata
+    Base.metadata.create_all(engine)
+
+    # Now that the tables exist, we can alter the table to add the column
+    with Session(engine) as session:
+        session.execute(text("""
+            ALTER TABLE documents
+            ADD COLUMN content_ts_vector tsvector
+            GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+        """))
+
+        session.execute(text("""
+                             CREATE INDEX content_ts_vector_idx ON documents USING GIN (content_ts_vector);
+                             """))
+        
+
+
+
         session.commit()
 
-    Base.metadata.create_all(engine)
+
+
+
+  
 
 
 def get_db_engine() -> sqlalchemy.engine.base.Engine:
@@ -79,7 +126,11 @@ def get_db_engine() -> sqlalchemy.engine.base.Engine:
 
 def insert_reddit_post(p: dict) -> None:
     """
-    Loads a Reddit post into the database.
+    Loads a Reddit post into the database. Internally, this function calculates
+    the hash value of the post content and stores it in the database. This hash
+    value can be used to check if the post has been modified since it was loaded
+    into the database.
+
     Args:
         p (dict): A dictionary containing the Reddit post data. The dictionary
                   should have the following keys:
@@ -120,7 +171,9 @@ def insert_reddit_post(p: dict) -> None:
         session.commit()
 
 
-def insert_documents_from_comments_body(post_id: str, chunk_size: int, chunk_overlap: int) -> None:
+def insert_documents_from_comments_body(
+    post_id: str, chunk_size: int, chunk_overlap: int
+) -> None:
     """
     Inserts the comments body into the database. If the comments body exceeds
     the token limit, the body is split into chunks and each chunk is inserted
@@ -142,7 +195,9 @@ def insert_documents_from_comments_body(post_id: str, chunk_size: int, chunk_ove
 
     # Split the document body into chunks
     tokens = openai.get_tokens_from_string(document_body)
-    num_chunks = (len(tokens) + chunk_size - 1) // chunk_size  # Calculate the number of chunks
+    num_chunks = (
+        len(tokens) + chunk_size - 1
+    ) // chunk_size  # Calculate the number of chunks
 
     for chunk_id in range(1, num_chunks + 1):
         start = (chunk_id - 1) * (chunk_size - chunk_overlap)
@@ -164,6 +219,34 @@ def insert_documents_from_comments_body(post_id: str, chunk_size: int, chunk_ove
             )
             session.add(d)
             session.commit()
+
+
+def vector_search(text_query: str, limit: int) -> list[tuple]:
+    """Returns the most similar records to the given vector."""
+
+    # NOTE: Casting for vector type https://github.com/pgvector/pgvector-python/issues/4
+    # The smaller the cosine distance, the more semantically similar two vectors are.
+    # Partial results are
+    # ('1ftama5_1', 0.39604451632764925, 1)
+    # ('1fv6hi1_3', 0.3967565950831704, 2)
+    query = """
+    SELECT id, RANK () OVER (ORDER BY embedding <=> %(vector)s::vector) AS rank
+    FROM documents
+    ORDER BY embedding <=> %(vector)s::vector ASC
+    LIMIT %(limit)s;
+    """
+    vector = openai.get_embedding(text_query)
+    cursor = get_cursor()
+    cursor.execute(query, {"vector": vector, "limit": limit})
+    result = cursor.fetchall()
+    cursor.close()
+    return result
+
+def keywork_search(text_query: str, limit: int) -> list[tuple]:
+    pass
+
+
+
 
 
 def is_post_modified(post_id: str) -> bool:
