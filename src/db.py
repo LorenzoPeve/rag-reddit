@@ -43,6 +43,7 @@ class Documents(Base):
     def __repr__(self):
         return f"<Document(id={self.id}, post_id={self.post_id}, chunk_id={self.chunk_id})>"
 
+
 def get_db_engine() -> sqlalchemy.engine.base.Engine:
     """
     Creates and returns a SQLAlchemy engine instance for connecting to a PostgreSQL database.
@@ -62,6 +63,7 @@ def get_db_engine() -> sqlalchemy.engine.base.Engine:
     )
 
     return create_engine(connection_string)
+
 
 def get_cursor():
     """
