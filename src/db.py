@@ -43,6 +43,25 @@ class Documents(Base):
     def __repr__(self):
         return f"<Document(id={self.id}, post_id={self.post_id}, chunk_id={self.chunk_id})>"
 
+def get_db_engine() -> sqlalchemy.engine.base.Engine:
+    """
+    Creates and returns a SQLAlchemy engine instance for connecting to a PostgreSQL database.
+    The connection string is constructed using environment variables:
+    - DB_USER: The username for the database.
+    - DB_PASSWORD: The password for the database.
+    - DB_HOST: The hostname of the database server.
+    - DB_PORT: The port number on which the database server is listening.
+    - DB_NAME: The name of the database.
+    Returns:
+        sqlalchemy.engine.base.Engine: A SQLAlchemy engine instance for the PostgreSQL database.
+    """
+
+    connection_string = (
+        f'postgresql://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}'
+        f'@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
+    )
+
+    return create_engine(connection_string)
 
 def get_cursor():
     """
@@ -67,20 +86,15 @@ def init_schema() -> None:
     engine = get_db_engine()
 
     with Session(engine) as session:
-        # Drop and recreate the schema
         session.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
         session.execute(text("CREATE SCHEMA public;"))
-        
-        # Create the vector extension (if not exists)
         session.execute(
             text("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;")
         )
-        session.commit()  # Commit schema changes before creating tables
+        session.commit()
 
-    # Create all tables from metadata
     Base.metadata.create_all(engine)
 
-    # Now that the tables exist, we can alter the table to add the column
     with Session(engine) as session:
         session.execute(text("""
             ALTER TABLE documents
@@ -88,40 +102,12 @@ def init_schema() -> None:
             GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
         """))
 
+        # Adding indexes for full-text search and vector search
         session.execute(text("""
-                             CREATE INDEX content_ts_vector_idx ON documents USING GIN (content_ts_vector);
-                             """))
-        
-
-
-
+            CREATE INDEX content_ts_vector_idx ON documents USING GIN (content_ts_vector);
+            CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops);
+        """))
         session.commit()
-
-
-
-
-  
-
-
-def get_db_engine() -> sqlalchemy.engine.base.Engine:
-    """
-    Creates and returns a SQLAlchemy engine instance for connecting to a PostgreSQL database.
-    The connection string is constructed using environment variables:
-    - DB_USER: The username for the database.
-    - DB_PASSWORD: The password for the database.
-    - DB_HOST: The hostname of the database server.
-    - DB_PORT: The port number on which the database server is listening.
-    - DB_NAME: The name of the database.
-    Returns:
-        sqlalchemy.engine.base.Engine: A SQLAlchemy engine instance for the PostgreSQL database.
-    """
-
-    connection_string = (
-        f'postgresql://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}'
-        f'@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
-    )
-
-    return create_engine(connection_string)
 
 
 def insert_reddit_post(p: dict) -> None:
@@ -242,11 +228,9 @@ def vector_search(text_query: str, limit: int) -> list[tuple]:
     cursor.close()
     return result
 
+
 def keywork_search(text_query: str, limit: int) -> list[tuple]:
     pass
-
-
-
 
 
 def is_post_modified(post_id: str) -> bool:
