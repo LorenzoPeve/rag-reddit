@@ -7,7 +7,6 @@ from pgvector.sqlalchemy import Vector
 
 from src import reddit, openai
 import psycopg2
-from psycopg2 import extensions
 
 
 Base = declarative_base()
@@ -107,7 +106,7 @@ def init_schema() -> None:
         # Adding indexes for full-text search and vector search
         session.execute(text("""
             CREATE INDEX content_ts_vector_idx ON documents USING GIN (content_ts_vector);
-            CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops);
+            CREATE INDEX embedding_idx ON documents USING hnsw (embedding vector_cosine_ops);
         """))
         session.commit()
 
@@ -210,8 +209,10 @@ def insert_documents_from_comments_body(
 
 
 def vector_search(text_query: str, limit: int) -> list[tuple]:
-    """Returns the most similar records to the given vector."""
-
+    """
+    Returns the id and rank of the most semantically similar documents to the
+    input text query.
+    """
     # NOTE: Casting for vector type https://github.com/pgvector/pgvector-python/issues/4
     # The smaller the cosine distance, the more semantically similar two vectors are.
     # Partial results are
@@ -231,8 +232,73 @@ def vector_search(text_query: str, limit: int) -> list[tuple]:
     return result
 
 
-def keywork_search(text_query: str, limit: int) -> list[tuple]:
-    pass
+def keyword_search(text_query: str, limit: int) -> list[tuple]:
+    """Performns full-text search on the content of the documents."""    
+    query = """
+    WITH ts_query AS (
+        SELECT replace(plainto_tsquery(%(text_query)s)::text, '&', '|') AS modified_query
+    )
+    SELECT
+        id,
+        RANK () OVER (
+            ORDER BY ts_rank_cd(
+                content_ts_vector,
+                to_tsquery('english', (SELECT modified_query FROM ts_query)),
+                2
+            ) DESC
+        ) AS rank
+    FROM documents
+    WHERE
+        content_ts_vector @@
+        to_tsquery('english', (SELECT modified_query FROM ts_query))
+    ORDER BY rank
+    LIMIT %(limit)s;
+    """
+    cursor = get_cursor()
+    cursor.execute(query, {"text_query": text_query, "limit": limit})
+    result = cursor.fetchall()
+    cursor.close()
+    return result
+
+
+def hybrid_search(text_query: str, limit: int) -> list[tuple]:
+    """Performs a hybrid search using both full-text search and vector search."""
+
+    keyword_results = keyword_search(text_query, limit)
+    vector_results = vector_search(text_query, limit)
+
+    # Convert results into a format suitable for use in a SQL query
+    keyword_query = ", ".join([f"('{id}', {rank})" for id, rank in keyword_results])
+    vector_query = ", ".join([f"('{id}', {rank})" for id, rank in vector_results])
+
+    hybrid_query = f"""
+        WITH vector_search AS (
+            SELECT *
+            FROM (VALUES {vector_query}) AS v(id, rank)
+        ),
+        fulltext_search AS (
+            SELECT *
+            FROM (VALUES {keyword_query}) AS k(id, rank)
+        ),
+        hybrid_search AS (
+            SELECT
+                COALESCE(vector_search.id, fulltext_search.id) AS id,
+                COALESCE(1.0 / (%(k)s + vector_search.rank), 0.0) +
+                COALESCE(1.0 / (%(k)s + fulltext_search.rank), 0.0) AS score
+            FROM vector_search
+            FULL OUTER JOIN fulltext_search ON vector_search.id = fulltext_search.id
+            ORDER BY score DESC
+        )
+        SELECT hybrid_search.id, score, content
+        FROM hybrid_search
+        LEFT JOIN documents ON hybrid_search.id = documents.id
+        ORDER BY score DESC
+    """
+    cursor = get_cursor()
+    cursor.execute(hybrid_query, {"k": 60})
+    result = cursor.fetchall()
+    cursor.close()
+    return result
 
 
 def is_post_modified(post_id: str) -> bool:
