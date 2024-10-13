@@ -24,6 +24,12 @@ def test_get_top_posts():
     assert "selftext" in post
 
 
+def test_get_post_from_url():
+
+    url = "/r/dataengineering/comments/1fs80oq/my_job_hunt_journey_for_remote_data_engineering/"
+    post = reddit.get_post_from_url(url)
+
+
 def test_get_all_comments_in_post():
 
     # Get sample post
@@ -33,3 +39,18 @@ def test_get_all_comments_in_post():
     post_id = post["id"]
     comments = reddit.get_all_comments_in_post(post_id)
     assert isinstance(comments, str)
+
+
+def test_posts_and_comments():
+
+    posts = reddit.get_top_posts("dataengineering", limit=15, t="month")
+
+    out = []
+    for post in posts:
+        comments = reddit.get_all_comments_in_post(post["id"])
+        assert isinstance(comments, str)
+        assert len(comments) > 0
+        out.append({"post": post["permalink"], "comments": comments})
+
+    with open("posts_and_comments2.json", "w") as f:
+        json.dump(out, f, indent=4)
