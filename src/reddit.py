@@ -132,7 +132,7 @@ def traverse_comments(
     # Skip comments made by the bot
     if "I am a bot, and this action was performed automatically" in comment.body:
         return
-    
+
     if comment.body.startswith("RemindMe! "):
         return
 
@@ -147,7 +147,6 @@ def traverse_comments(
 
     if comment.body.lower() not in discard:
         collected_comments.append(sanitize_text(comment.body))
-
 
     # Recursively traverse replies if they exist and we haven't exceeded max_depth
     for reply in comment.replies:
