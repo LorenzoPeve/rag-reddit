@@ -39,3 +39,8 @@ def test_get_embedding_2():
     embeddings = openai.get_embedding(test_string)
     assert isinstance(embeddings, list)
     assert len(embeddings) == 1536
+
+def test_rag_query():
+    question = "Currently, what is the best API for web scraping large swaths of data?"
+    response = openai.rag_query(question)
+    # assert type(respon)
