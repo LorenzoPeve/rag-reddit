@@ -1,5 +1,6 @@
 import os
 from openai import OpenAI
+import re
 import tiktoken
 
 from src import db
@@ -16,20 +17,21 @@ domain knowledge. Be brief in your answers.
 
 Your domain knowledge comes from a specific forum where users ask questions and receive answers.
 
-Answer ONLY with the facts listed in the list of sources below.
+Use ONLY the provided context information to form your response.
 
 If there isn't enough information below, say you don't know. Do not generate
 answers that don't use the sources below.
 
 If asking a clarifying question to the user would help, ask the question.
 
-If the question is not in English, translate to English and then answer the question.
-
 Each source contains information about a specific post. Each source has a title
-and a body.
+and a body. Always include the source ID for each fact you use in the response.
+
+Use double square brackets to reference the source, for example [[info1.txt]].
+Don't combine sources, list each source separately, for example [[info1.txt]][[info2.pdf]]
 """.strip()
 
-follow_up_questions_prompt_content = """
+follow_up_questions_prompt = """
 Generate 3 very brief follow-up questions that the user would likely ask next.
 Enclose the follow-up questions in double angle brackets. Example:
 <<Are there exclusions for prescriptions?>>
@@ -73,9 +75,56 @@ def get_embedding(string: str) -> list[float]:
     return response.data[0].embedding
 
 
-def rag_query(
-    question: str,
-    sources: list[(tuple[str, str])],
-):
+def rag_query(question: str) -> str:
+    sources: list[tuple] = db.hybrid_search(question, limit=5)
 
-    pass
+    # Recall output from db.hybrid_search is in the form (id, title, score, content)
+    parsed_sources = []
+    for source in sources:
+        post_id = source[0]
+        title = source[1]
+        body = source[3]
+
+        if body.startswith(title):
+            body = body[len(title) :].strip()
+
+        parsed_sources.append((post_id, title, body))
+
+    # Generate prompt with context
+    prompt = (
+        f"Based on the following context, answer the user's question.\n"
+        f"Question: {question}\n\n"
+        f"Context:\n\n"
+    )
+
+    for post_id, title, body in parsed_sources:
+        prompt += f"Post ID: {post_id}\nTitle: {title}\nBody: {body}\n\n"
+
+    with open("prompt.txt", "w") as f:
+        f.write(prompt)
+
+    # Check prompt token limit
+    n_tokens = get_num_tokens_from_string(prompt)
+    if n_tokens > 100_000:
+        raise ValueError(
+            f"Prompt is too big. Number of tokens is {n_tokens}."
+        )
+
+    completion = OPENAI_CLIENT.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": f'{system_prompt}\n{follow_up_questions_prompt}'},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.0,
+    )
+
+    import json
+    with open("response.json", "w") as f:
+        f.write(json.dumps(completion.to_dict(), indent=4))
+
+    response = completion.choices[0].message.content
+
+    response = response.replace('[[info1.txt]]', '""')
+    response = response.replace('[[info2.pdf]]', '""')
+    return response
