@@ -243,8 +243,7 @@ def keyword_search(text_query: str, limit: int) -> list[tuple]:
         RANK () OVER (
             ORDER BY ts_rank_cd(
                 content_ts_vector,
-                to_tsquery('english', (SELECT modified_query FROM ts_query)),
-                2
+                to_tsquery('english', (SELECT modified_query FROM ts_query))
             ) DESC
         ) AS rank
     FROM documents
@@ -289,9 +288,10 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
             FULL OUTER JOIN fulltext_search ON vector_search.id = fulltext_search.id
             ORDER BY score DESC
         )
-        SELECT hybrid_search.id, score, content
+        SELECT hybrid_search.id, title, score, content
         FROM hybrid_search
         LEFT JOIN documents ON hybrid_search.id = documents.id
+        LEFT JOIN posts ON documents.post_id = posts.id
         ORDER BY score DESC
     """
     cursor = get_cursor()
