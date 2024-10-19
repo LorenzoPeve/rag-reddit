@@ -30,6 +30,14 @@ def test_get_post_from_url():
     post = reddit.get_post_from_url(url)
 
 
+def test_get_post_from_id():
+
+    r = reddit.get_post_from_id("1fs80oq")
+    assert r.num_comments > 100
+    assert r.upvotes > 500
+    assert "Europe" in r.title
+
+
 def test_get_all_comments_in_post():
 
     # Get sample post
