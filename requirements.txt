@@ -1,5 +1,5 @@
 azure-functions
-openai-1.51.2
+openai==1.51.2
 pgvector==0.3.5
 praw==7.7.1
 psycopg2==2.9.9
