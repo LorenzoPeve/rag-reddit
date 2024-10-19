@@ -3,11 +3,11 @@ import logging
 import os
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey
-from sqlalchemy.orm import Session, declarative_base, Mapped, mapped_column
+from sqlalchemy.orm import Session, declarative_base, Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
-
-from src import reddit, openai
 import psycopg2
+
+from src import reddit, rag
 
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -37,6 +37,8 @@ class RedditPosts(Base):
     permalink = Column(String, nullable=False)
     content_hash = Column(String(32), nullable=False)
 
+    documents = relationship('Documents', back_populates='post', cascade='all, delete-orphan')
+
     def __repr__(self):
         return f"<RedditPost(id={self.id}, title={self.title})>"
 
@@ -46,10 +48,12 @@ class Documents(Base):
     __tablename__ = "documents"
 
     id = Column(String(32), primary_key=True)
-    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id"), nullable=False)
+    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id", ondelete='CASCADE'), nullable=False)
     chunk_id = Column(Integer, nullable=False)
     content = Column(String, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=True)
+
+    post = relationship('RedditPosts', back_populates='documents')
 
     def __repr__(self):
         return f"<Document(id={self.id}, post_id={self.post_id}, chunk_id={self.chunk_id})>"
@@ -215,7 +219,7 @@ def insert_documents_from_comments_body(
     document_body = f"{post.title}\n{post.description}\n{comments}"
 
     # Split the document body into chunks
-    tokens = openai.get_tokens_from_string(document_body)
+    tokens = rag.get_tokens_from_string(document_body)
     num_chunks = (
         len(tokens) + chunk_size - 1
     ) // chunk_size  # Calculate the number of chunks
@@ -223,7 +227,7 @@ def insert_documents_from_comments_body(
     for chunk_id in range(1, num_chunks + 1):
         start = (chunk_id - 1) * (chunk_size - chunk_overlap)
         end = start + chunk_size
-        chunk_content = openai.get_string_from_tokens(tokens[start:end])
+        chunk_content = rag.get_string_from_tokens(tokens[start:end])
 
         # Prepend the title to all chunks except the first one
         if chunk_id != 1:
@@ -236,7 +240,7 @@ def insert_documents_from_comments_body(
                 post_id=post_id,
                 chunk_id=chunk_id,
                 content=chunk_content,
-                embedding=openai.get_embedding(chunk_content),
+                embedding=rag.get_embedding(chunk_content),
             )
             session.add(d)
             session.commit()
@@ -258,7 +262,7 @@ def vector_search(text_query: str, limit: int) -> list[tuple]:
     ORDER BY embedding <=> %(vector)s::vector ASC
     LIMIT %(limit)s;
     """
-    vector = openai.get_embedding(text_query)
+    vector = rag.get_embedding(text_query)
     cursor = get_cursor()
     cursor.execute(query, {"vector": vector, "limit": limit})
     result = cursor.fetchall()
@@ -336,7 +340,9 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
 
 
 def is_post_modified(post_id: str) -> bool:
-    """ """
+    """
+    Returns True if a Reddit post has been modified since it was loaded into the database.
+    """
     logger.info(f"Checking if post {post_id} has been modified.")
     with Session(get_db_engine()) as session:
         db_post = session.query(RedditPosts).filter_by(id=post_id).first()
@@ -344,14 +350,14 @@ def is_post_modified(post_id: str) -> bool:
     reddit_post = reddit.get_post_from_id(post_id)
 
     logger.info(
-        f"Checking number of comments. Reddit: {reddit_post.num_comments}, DB: {db_post.num_comments}"
+        f"Checking number of comments. Reddit: {reddit_post['num_comments']}, DB: {db_post.num_comments}"
     )
-    if reddit_post.num_comments != db_post.num_comments:
+    if reddit_post['num_comments'] != db_post.num_comments:
         return True
 
     comments = reddit.get_all_comments_in_post(post_id)
     content_hash = get_content_hash(
-        reddit_post.title, reddit_post.description, comments
+        reddit_post['title'], reddit_post['description'], comments
     )
 
     logger.info(
@@ -361,3 +367,16 @@ def is_post_modified(post_id: str) -> bool:
     if content_hash != db_post.content_hash:
         return True
     return False
+
+def get_posts_without_documents() -> list[RedditPosts]:
+    """
+    Iterates over all posts and returns posts that do not have any associated documents.
+
+    Returns:
+        list[RedditPosts]: A list of RedditPosts objects that do not have any associated documents.
+    """
+    engine = get_db_engine()
+    with Session(engine) as session:
+        posts_without_docs = session.query(RedditPosts).outerjoin(Documents).filter(Documents.id == None).all()
+
+    return [post.id for post in posts_without_docs]

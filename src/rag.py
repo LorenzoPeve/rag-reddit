@@ -1,6 +1,5 @@
 import os
 from openai import OpenAI
-import re
 import tiktoken
 
 from src import db

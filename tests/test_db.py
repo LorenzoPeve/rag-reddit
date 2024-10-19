@@ -85,5 +85,9 @@ def test_hybrid_search():
 
 
 def test_is_post_modified():
-    result = db.is_post_modified("1fs80oq")
-    assert result == False
+    result = db.is_post_modified("1fwv29o")
+    assert result == True
+
+def test_get_posts_without_documents():
+    result = db.get_posts_without_documents()
+    assert len(result) == 0

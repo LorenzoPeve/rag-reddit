@@ -81,7 +81,7 @@ def get_post_from_id(post_id: str) -> dict:
     `RedditPosts` object.
     """
     r = REDDIT.submission(id=post_id)
-    return db.RedditPosts(
+    return dict(
         id=post_id,
         title=r.title,
         description=r.selftext,
