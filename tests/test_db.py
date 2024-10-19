@@ -29,30 +29,6 @@ def test_insert_reddit_post():
         assert len(post.content_hash) == 32
 
 
-def test_insert_documents_from_comments_body():
-
-    # db.init_schema()
-    # db.insert_reddit_post({
-    #     'id': '1fs80oq',
-    #     'title': 'What do you think about this?',
-    #     'selftext': 'This is a test post',
-    #     'ups': 10,
-    #     'downs': 2,
-    #     'link_flair_text': 'test',
-    #     'num_comments': 14,
-    #     'permalink': 'test',
-    # })
-
-    # db.insert_documents_from_comments_body('1fs80oq', 100, 50)
-
-    # with db.Session(db.get_db_engine()) as session:
-    #     documents = session.query(db.Documents).filter_by(post_id='1fs80oq').all()
-    #     assert len(documents) == 1
-    #     assert len(documents[0].content) == 100
-    #     assert len(documents[0].embedding) == 768
-    pass
-
-
 def test_vector_search():
 
     rows = db.vector_search(
@@ -87,6 +63,7 @@ def test_hybrid_search():
 def test_is_post_modified():
     result = db.is_post_modified("1fwv29o")
     assert result == True
+
 
 def test_get_posts_without_documents():
     result = db.get_posts_without_documents()
