@@ -1,8 +1,9 @@
+from datetime import datetime, timezone
 import hashlib
 import logging
 import os
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey
+from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey, DateTime
 from sqlalchemy.orm import Session, declarative_base, Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 import psycopg2
@@ -30,12 +31,15 @@ class RedditPosts(Base):
     id = Column(String(32), primary_key=True)
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)  # image posts have no description
+    score = Column(Integer, nullable=False)
     upvotes = Column(Integer, nullable=False)
     downvotes = Column(Integer, nullable=False)
     tag = Column(String(30), nullable=True)
     num_comments = Column(Integer, nullable=False)
     permalink = Column(String, nullable=False)
     content_hash = Column(String(32), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    last_updated_at = Column(DateTime, nullable=False)
 
     documents = relationship('Documents', back_populates='post', cascade='all, delete-orphan')
 
@@ -179,18 +183,24 @@ def insert_reddit_post(p: dict) -> None:
     comments = reddit.get_all_comments_in_post(p["id"])
     content_hash = get_content_hash(p["title"], p["selftext"], comments)
 
+    now = datetime.now(timezone.utc)
+    now = now.replace(microsecond=0)
+
     # Insert the post into the database
     with Session(engine) as session:
         post = RedditPosts(
             id=p["id"],
             title=p["title"],
             description=p["selftext"],
+            score=p["score"],
             upvotes=p["ups"],
             downvotes=p["downs"],
             tag=p["link_flair_text"],
             num_comments=p["num_comments"],
             permalink=p["permalink"],
             content_hash=content_hash,
+            created_at=datetime.fromtimestamp(p['created']),
+            last_updated_at=now,    
         )
         session.add(post)
         session.commit()
@@ -349,12 +359,14 @@ def is_post_modified(post_id: str) -> bool:
 
     reddit_post = reddit.get_post_from_id(post_id)
 
+    # Check if the number of comments has changed
     logger.info(
         f"Checking number of comments. Reddit: {reddit_post['num_comments']}, DB: {db_post.num_comments}"
     )
     if reddit_post['num_comments'] != db_post.num_comments:
         return True
 
+    # Check if the content hash has changed
     comments = reddit.get_all_comments_in_post(post_id)
     content_hash = get_content_hash(
         reddit_post['title'], reddit_post['description'], comments
@@ -367,6 +379,7 @@ def is_post_modified(post_id: str) -> bool:
     if content_hash != db_post.content_hash:
         return True
     return False
+
 
 def get_posts_without_documents() -> list[RedditPosts]:
     """
