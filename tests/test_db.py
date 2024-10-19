@@ -1,4 +1,4 @@
-from src import db, openai
+from src import db
 
 
 def test_insert_reddit_post():
@@ -70,14 +70,20 @@ def test_keywork_search():
     assert len(rows[0]) == 2
     assert type(rows[0][1]) == int
 
+
 def test_hybrid_search():
-    
+
     rows = db.hybrid_search("What are key features of a snowflake", limit=5)
     assert type(rows) == list
     assert len(rows[0]) == 4
     assert type(rows[0][0]) == str
-    assert '_' in rows[0][0]
+    assert "_" in rows[0][0]
     assert type(rows[0][1]) == str
     assert float(rows[0][2]) > 0
     assert type(rows[0][3]) == str
     assert len(rows[0][3]) > 100
+
+
+def test_is_post_modified():
+    result = db.is_post_modified("1fs80oq")
+    assert result == False
