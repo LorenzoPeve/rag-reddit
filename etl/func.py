@@ -5,8 +5,6 @@ import os
 from sqlalchemy.orm import Session
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from src import reddit, db
 from src.db import RedditPosts
 
@@ -16,50 +14,46 @@ load_dotenv(f".env.{os.getenv('ENVIRONMENT')}", override=True)
 CHUNK_SIZE = int(os.getenv('CHUNK_SIZE'))
 CHUNK_OVERLAP = int(os.getenv('CHUNK_OVERLAP'))
 
-log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-logging.basicConfig(
-    format=log_format,
-    level=logging.INFO,
-    datefmt="%H:%M:%S",
-    handlers=[
-        logging.FileHandler("test_app.log", mode="w", encoding='utf-8'),
-    ],
-)
-logger = logging.getLogger(__name__)
+def insert_reddit_post_and_comments(p: dict) -> None:
+    """
+    Inserts a Reddit post and its comments into the `posts` and `documents`
+    tables.
 
-
-def insert_reddit_post(p: dict):
+    If the post already exists and has been modified, the existing post is
+    deleted and a new post is inserted. Otherwise, the post is skipped.    
+    """
     with Session(db.get_db_engine()) as session:
         db_post = session.query(RedditPosts).filter_by(id=p["id"]).first()
 
     if db_post is None:
-        logger.info(f'Inserting Reddit post: {p["id"]}')
+        logging.info(f'Inserting Reddit post: {p["id"]}')
         db.insert_reddit_post(p)
         db.insert_documents_from_comments_body(p['id'], CHUNK_SIZE, CHUNK_OVERLAP)
     else:
-        logger.info(f'Reddit post already exists: {p["id"]}')
+        logging.info(f'Reddit post already exists: {p["id"]}')
         
         if db.is_post_modified(p['id']):
-            logger.info(f'Reddit post has been modified: {p["id"]}')
+            logging.info(f'Reddit post has been modified: {p["id"]}')
             
-            logger.info(f'Deleting existing post: {p["id"]}')
+            logging.info(f'Deleting existing post: {p["id"]}')
             with Session(db.get_db_engine()) as session:
                 session.query(RedditPosts).filter_by(id=p["id"]).delete()
                 session.commit()
 
-            logger.info(f'Inserting Reddit post: {p["id"]}')
+            logging.info(f'Inserting Reddit post: {p["id"]}')
             db.insert_reddit_post(p)
             db.insert_documents_from_comments_body(p['id'], CHUNK_SIZE, CHUNK_OVERLAP)
 
 def insert_reddit_posts(posts: list[dict]):
+    """Inserts a list of Reddit posts into the `posts` and `documents` tables."""
     for p in posts:
-        logger.info('Processing Reddit post: %s', p["permalink"])
+        logging.info('Processing Reddit post: %s', p["permalink"])
 
         if p["link_flair_text"] == "Meme":
-            logger.info(f'Skipping Reddit post. Reason: Meme')
+            logging.info(f'Skipping Reddit post. Reason: Meme')
             continue
 
-        insert_reddit_post(p)
+        insert_reddit_post_and_comments(p)
 
 if __name__ == "__main__":
 
@@ -71,9 +65,12 @@ if __name__ == "__main__":
 
     posts_w_no_docs = db.get_posts_without_documents()
     if len(posts_w_no_docs) > 0:
-        logger.info(f'Processing Reddit posts without documents: {len(posts_w_no_docs)}')
+        logging.info(f'Processing Reddit posts without documents: {len(posts_w_no_docs)}')
         
         for post_id in posts_w_no_docs:
-            post = reddit.get_post(post_id)
-            insert_reddit_post(post)
+            post = reddit.get_post_from_id(post_id)
+            insert_reddit_post_and_comments(post)
 
+
+
+    
