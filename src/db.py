@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey
@@ -8,6 +9,17 @@ from pgvector.sqlalchemy import Vector
 from src import reddit, openai
 import psycopg2
 
+
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(
+    format=log_format,
+    level=logging.INFO,
+    datefmt="%H:%M:%S",
+    handlers=[
+        logging.FileHandler("test_app.log", mode="w"),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -97,18 +109,41 @@ def init_schema() -> None:
     Base.metadata.create_all(engine)
 
     with Session(engine) as session:
-        session.execute(text("""
+        session.execute(
+            text(
+                """
             ALTER TABLE documents
             ADD COLUMN content_ts_vector tsvector
             GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
-        """))
+        """
+            )
+        )
 
         # Adding indexes for full-text search and vector search
-        session.execute(text("""
+        session.execute(
+            text(
+                """
             CREATE INDEX content_ts_vector_idx ON documents USING GIN (content_ts_vector);
             CREATE INDEX embedding_idx ON documents USING hnsw (embedding vector_cosine_ops);
-        """))
+        """
+            )
+        )
         session.commit()
+
+
+def get_content_hash(title: str, description: str, body: str) -> str:
+    """
+    Calculates the hash value of the post content.
+
+    Args:
+        title (str): The title of the post.
+        description (str): The description of the post.
+        body (str): The body text of the post.
+    Returns:
+        str: The hash value of the post content.
+    """
+    content = title + description + body
+    return hashlib.md5(content.encode()).hexdigest()
 
 
 def insert_reddit_post(p: dict) -> None:
@@ -138,8 +173,7 @@ def insert_reddit_post(p: dict) -> None:
     # Get all comments in the post and calculate the hash value
     # DEV NOTE: This allows us to check if the post has been modified
     comments = reddit.get_all_comments_in_post(p["id"])
-    body = p["title"] + p["selftext"] + comments
-    content_hash = hashlib.md5(body.encode()).hexdigest()
+    content_hash = get_content_hash(p["title"], p["selftext"], comments)
 
     # Insert the post into the database
     with Session(engine) as session:
@@ -233,7 +267,7 @@ def vector_search(text_query: str, limit: int) -> list[tuple]:
 
 
 def keyword_search(text_query: str, limit: int) -> list[tuple]:
-    """Performns full-text search on the content of the documents."""    
+    """Performns full-text search on the content of the documents."""
     query = """
     WITH ts_query AS (
         SELECT replace(plainto_tsquery(%(text_query)s)::text, '&', '|') AS modified_query
@@ -303,14 +337,27 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
 
 def is_post_modified(post_id: str) -> bool:
     """ """
+    logger.info(f"Checking if post {post_id} has been modified.")
     with Session(get_db_engine()) as session:
-        post = session.query(RedditPosts).filter_by(id=post_id).first()
+        db_post = session.query(RedditPosts).filter_by(id=post_id).first()
 
-    # comnpare number of comments
+    reddit_post = reddit.get_post_from_id(post_id)
 
-    # compare title or description
+    logger.info(
+        f"Checking number of comments. Reddit: {reddit_post.num_comments}, DB: {db_post.num_comments}"
+    )
+    if reddit_post.num_comments != db_post.num_comments:
+        return True
 
-    # if nothing change, return False
+    comments = reddit.get_all_comments_in_post(post_id)
+    content_hash = get_content_hash(
+        reddit_post.title, reddit_post.description, comments
+    )
 
-    # lastly, query comments and calculate hash value
-    pass
+    logger.info(
+        f"Checking content hash. Reddit: {content_hash}, DB: {db_post.content_hash}"
+    )
+
+    if content_hash != db_post.content_hash:
+        return True
+    return False
