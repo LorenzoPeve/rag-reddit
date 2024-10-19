@@ -5,6 +5,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 import unicodedata
 
+from src import db
 
 REDDIT = praw.Reddit(
     client_id=os.getenv("REDDIT_CLIENT_ID"),
@@ -72,6 +73,24 @@ def get_top_posts(subreddit: str, limit: int = 100, t: str = "month") -> list[di
         assert post["kind"] == "t3"
         out.append(post["data"])
     return out
+
+
+def get_post_from_id(post_id: str) -> dict:
+    """
+    Fetches a Reddit post using the post's unique identifier. Returns a
+    `RedditPosts` object.
+    """
+    r = REDDIT.submission(id=post_id)
+    return db.RedditPosts(
+        id=post_id,
+        title=r.title,
+        description=r.selftext,
+        upvotes=r.ups,
+        downvotes=r.downs,
+        tag=r.link_flair_text,
+        num_comments=r.num_comments,
+        permalink=r.permalink,
+    )
 
 
 def get_post_from_url(url: str) -> dict:
