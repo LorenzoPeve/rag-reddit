@@ -3,8 +3,22 @@ import hashlib
 import logging
 import os
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, create_engine, text, ForeignKey, DateTime
-from sqlalchemy.orm import Session, declarative_base, Mapped, mapped_column, relationship
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    create_engine,
+    text,
+    ForeignKey,
+    DateTime,
+)
+from sqlalchemy.orm import (
+    Session,
+    declarative_base,
+    Mapped,
+    mapped_column,
+    relationship,
+)
 from pgvector.sqlalchemy import Vector
 import psycopg2
 
@@ -41,7 +55,9 @@ class RedditPosts(Base):
     created_at = Column(DateTime, nullable=False)
     last_updated_at = Column(DateTime, nullable=False)
 
-    documents = relationship('Documents', back_populates='post', cascade='all, delete-orphan')
+    documents = relationship(
+        "Documents", back_populates="post", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<RedditPost(id={self.id}, title={self.title})>"
@@ -52,12 +68,14 @@ class Documents(Base):
     __tablename__ = "documents"
 
     id = Column(String(32), primary_key=True)
-    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id", ondelete='CASCADE'), nullable=False)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("posts.id", ondelete="CASCADE"), nullable=False
+    )
     chunk_id = Column(Integer, nullable=False)
     content = Column(String, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=True)
 
-    post = relationship('RedditPosts', back_populates='documents')
+    post = relationship("RedditPosts", back_populates="documents")
 
     def __repr__(self):
         return f"<Document(id={self.id}, post_id={self.post_id}, chunk_id={self.chunk_id})>"
@@ -199,8 +217,8 @@ def insert_reddit_post(p: dict) -> None:
             num_comments=p["num_comments"],
             permalink=p["permalink"],
             content_hash=content_hash,
-            created_at=datetime.fromtimestamp(p['created']),
-            last_updated_at=now,    
+            created_at=datetime.fromtimestamp(p["created"]),
+            last_updated_at=now,
         )
         session.add(post)
         session.commit()
@@ -363,13 +381,13 @@ def is_post_modified(post_id: str) -> bool:
     logger.info(
         f"Checking number of comments. Reddit: {reddit_post['num_comments']}, DB: {db_post.num_comments}"
     )
-    if reddit_post['num_comments'] != db_post.num_comments:
+    if reddit_post["num_comments"] != db_post.num_comments:
         return True
 
     # Check if the content hash has changed
     comments = reddit.get_all_comments_in_post(post_id)
     content_hash = get_content_hash(
-        reddit_post['title'], reddit_post['description'], comments
+        reddit_post["title"], reddit_post["description"], comments
     )
 
     logger.info(
@@ -390,6 +408,11 @@ def get_posts_without_documents() -> list[RedditPosts]:
     """
     engine = get_db_engine()
     with Session(engine) as session:
-        posts_without_docs = session.query(RedditPosts).outerjoin(Documents).filter(Documents.id == None).all()
+        posts_without_docs = (
+            session.query(RedditPosts)
+            .outerjoin(Documents)
+            .filter(Documents.id == None)
+            .all()
+        )
 
     return [post.id for post in posts_without_docs]
