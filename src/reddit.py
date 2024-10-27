@@ -39,7 +39,7 @@ def get_auth_token() -> str:
     return response.json()["access_token"]
 
 
-def get_top_posts(subreddit: str, limit: int = 100, t: str = "month") -> list[dict]:
+def get_top_posts(subreddit: str, limit: int = 100, t: str = "month", after: str = None) -> list[dict]:
     """
     Fetches the top posts from a specified subreddit within a given time frame.
     Args:
@@ -57,7 +57,7 @@ def get_top_posts(subreddit: str, limit: int = 100, t: str = "month") -> list[di
             "Authorization": f"bearer {get_auth_token()}",
             "User-Agent": os.getenv("USER_AGENT"),
         },
-        params={"limit": limit, "t": t},
+        params={"limit": limit, "t": t, 'after': after},
     )
 
     if response.status_code != 200:
@@ -85,11 +85,13 @@ def get_post_from_id(post_id: str) -> dict:
         id=post_id,
         title=r.title,
         description=r.selftext,
+        score=r.score,
         upvotes=r.ups,
         downvotes=r.downs,
         tag=r.link_flair_text,
         num_comments=r.num_comments,
         permalink=r.permalink,
+        created=r.created_utc,
     )
 
 
@@ -144,7 +146,6 @@ def traverse_comments(
     Returns:
         None: The function modifies the collected_comments list in place.
     """
-    # Stop if we have exceeded the maximum depth
     if depth > max_depth:
         return
 
@@ -155,7 +156,6 @@ def traverse_comments(
     if comment.body.startswith("RemindMe! "):
         return
 
-    # Add the current comment's body to the list if it's not in the discard list
     discard = [
         "following",
         "following!",
@@ -167,7 +167,7 @@ def traverse_comments(
     if comment.body.lower() not in discard:
         collected_comments.append(sanitize_text(comment.body))
 
-    # Recursively traverse replies if they exist and we haven't exceeded max_depth
+    # Recursively call
     for reply in comment.replies:
         traverse_comments(reply, collected_comments, depth + 1, max_depth)
 
