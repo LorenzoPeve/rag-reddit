@@ -24,16 +24,7 @@ import psycopg2
 
 from src import reddit, rag
 
-
-log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-logging.basicConfig(
-    format=log_format,
-    level=logging.INFO,
-    datefmt="%H:%M:%S",
-    handlers=[
-        logging.FileHandler("test_app.log", mode="w"),
-    ],
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 Base = declarative_base()
