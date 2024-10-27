@@ -3,11 +3,11 @@ from dotenv import load_dotenv
 import logging
 import os
 from sqlalchemy.orm import Session
-from time import time
+import time
 
 from src import reddit, db
 from src.db import RedditPosts
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv(".env.production", override=True)
 
@@ -65,6 +65,9 @@ def insert_reddit_posts(posts: list[dict]):
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(process_post, p) for p in posts]
+
+        for f in as_completed(futures):
+            f.result()
 
 
 app = func.FunctionApp()
