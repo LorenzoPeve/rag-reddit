@@ -13,17 +13,21 @@ from src.db import RedditPosts
 
 load_dotenv(".env.production", override=True)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP"))
 
+
 def delete_post(post_id: str):
-    logging.info(f'Deleting existing post: {post_id}')
+    logging.info(f"Deleting existing post: {post_id}")
     with Session(db.get_db_engine()) as session:
         session.query(RedditPosts).filter_by(id=post_id).delete()
         session.commit()
+
 
 def insert_reddit_post_and_comments(p: dict) -> None:
     """
@@ -74,6 +78,7 @@ def insert_reddit_posts(posts: list[dict]):
         for f in as_completed(futures):
             f.result()
 
+
 def lambda_handler(event, context):
     logging.info("Lambda function starting")
     logging.info("Function starting")
@@ -81,7 +86,9 @@ def lambda_handler(event, context):
     after = None
     for i in range(1, 10):
         logging.info(f"Fetching top posts from r/dataengineering {i}")
-        posts = reddit.get_top_posts("dataengineering", limit=50, t="month", after=after)
+        posts = reddit.get_top_posts(
+            "dataengineering", limit=50, t="month", after=after
+        )
         after = "t3_" + posts[-1]["id"]
         insert_reddit_posts(posts)
         time.sleep(10)
