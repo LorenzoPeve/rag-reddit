@@ -86,9 +86,7 @@ def lambda_handler(event, context):
     after = None
     for i in range(1, 10):
         logging.info(f"Fetching top posts from r/dataengineering {i}")
-        posts = reddit.get_top_posts(
-            "dataengineering", limit=50, t="month", after=after
-        )
+        posts = reddit.get_top_posts("dataengineering", limit=50, t="year", after=after)
         after = "t3_" + posts[-1]["id"]
         insert_reddit_posts(posts)
         time.sleep(10)
