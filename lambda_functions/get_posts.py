@@ -83,16 +83,21 @@ def lambda_handler(event, context):
     logging.info("Lambda function starting")
     logging.info("Function starting")
 
+    retrieved = 0
     after = None
-    for i in range(1, 10):
+    for i in range(10):
         logging.info(f"Fetching top posts from r/dataengineering {i}")
-        posts = reddit.get_top_posts("dataengineering", limit=50, t="all", after=after)
+        posts = reddit.get_top_posts(
+            "dataengineering", limit=50, t=event, after=after
+        )
         after = "t3_" + posts[-1]["id"]
         insert_reddit_posts(posts)
-        time.sleep(10)
+        retrieved += len(posts)
+        time.sleep(5)
 
     logging.info("Function completed")
+    return f'Retrieved best {retrieved} posts for the {event}.'
 
 
 if __name__ == "__main__":
-    lambda_handler(None, None)
+    print(lambda_handler('all', None))
