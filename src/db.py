@@ -20,15 +20,21 @@ from sqlalchemy.orm import (
     relationship,
 )
 from pgvector.sqlalchemy import Vector
-import psycopg2
+import psycopg
 
 from src import reddit, rag
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-Base = declarative_base()
 
+connection_string = (
+    f'postgresql+psycopg://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}'
+    f'@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
+)
+engine = create_engine(connection_string, pool_size=20)
+
+Base = declarative_base()
 
 class RedditPosts(Base):
     __tablename__ = "posts"
@@ -72,37 +78,16 @@ class Documents(Base):
         return f"<Document(id={self.id}, post_id={self.post_id}, chunk_id={self.chunk_id})>"
 
 
-def get_db_engine() -> sqlalchemy.engine.base.Engine:
-    """
-    Creates and returns a SQLAlchemy engine instance for connecting to a PostgreSQL database.
-    The connection string is constructed using environment variables:
-    - DB_USER: The username for the database.
-    - DB_PASSWORD: The password for the database.
-    - DB_HOST: The hostname of the database server.
-    - DB_PORT: The port number on which the database server is listening.
-    - DB_NAME: The name of the database.
-    Returns:
-        sqlalchemy.engine.base.Engine: A SQLAlchemy engine instance for the PostgreSQL database.
-    """
-
-    connection_string = (
-        f'postgresql://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}'
-        f'@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
-    )
-
-    return create_engine(connection_string)
-
-
 def get_cursor():
     """
-    Connects to the PostgreSQL database using psycopg2 and returns the connection and cursor objects.
+    Connects to the PostgreSQL database using psycopg and returns the connection and cursor objects.
     The connection parameters are retrieved from environment variables.
 
     Returns:
         conn: The connection object to the PostgreSQL database.
         cur: The cursor object for executing SQL queries.
     """
-    conn = psycopg2.connect(
+    conn = psycopg.connect(
         dbname=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
@@ -113,7 +98,7 @@ def get_cursor():
 
 
 def init_schema() -> None:
-    engine = get_db_engine()
+    
 
     with Session(engine) as session:
         session.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
@@ -185,7 +170,7 @@ def insert_reddit_post(p: dict) -> None:
         None
     """
     assert type(p) == dict
-    engine = get_db_engine()
+    
 
     # Get all comments in the post and calculate the hash value
     # DEV NOTE: This allows us to check if the post has been modified
@@ -228,7 +213,7 @@ def insert_documents_from_comments_body(
     Returns:
         None
     """
-    engine = get_db_engine()
+    
 
     with Session(engine) as session:
         post = session.query(RedditPosts).filter_by(id=post_id).first()
@@ -397,7 +382,7 @@ def get_posts_without_documents() -> list[RedditPosts]:
     Returns:
         list[RedditPosts]: A list of RedditPosts objects that do not have any associated documents.
     """
-    engine = get_db_engine()
+    
     with Session(engine) as session:
         posts_without_docs = (
             session.query(RedditPosts)
