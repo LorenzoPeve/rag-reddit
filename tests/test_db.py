@@ -1,32 +1,40 @@
 from src import db
 
-
 def test_insert_reddit_post():
 
-    db.init_schema()
-    db.insert_reddit_post(
-        {
-            "id": "1fs80oq",
-            "title": "What do you think about this?",
-            "selftext": "This is a test post",
-            "ups": 10,
-            "downs": 2,
-            "link_flair_text": "test",
-            "num_comments": 14,
-            "permalink": "test",
-        }
-    )
+    try:
+        db.insert_reddit_post(
+            {
+                "id": "11AAZZ",
+                "title": "What do you think about this?",
+                "selftext": "This is a test post",
+                "ups": 10,
+                "downs": 2,
+                "link_flair_text": "test",
+                "num_comments": 14,
+                "permalink": "test",
+                'score': 10,
+                'created': 1620000000,
+            }
+        )
 
-    with db.Session(db.get_db_engine()) as session:
-        post = session.query(db.RedditPosts).filter_by(id="1fs80oq").first()
-        assert post.title == "What do you think about this?"
-        assert post.description == "This is a test post"
-        assert post.upvotes == 10
-        assert post.downvotes == 2
-        assert post.tag == "test"
-        assert post.num_comments == 14
-        assert post.permalink == "test"
-        assert len(post.content_hash) == 32
+        with db.Session(db.get_db_engine()) as session:
+            post = session.query(db.RedditPosts).filter_by(id="11AAZZ").first()
+            assert post.title == "What do you think about this?"
+            assert post.description == "This is a test post"
+            assert post.upvotes == 10
+            assert post.downvotes == 2
+            assert post.tag == "test"
+            assert post.num_comments == 14
+            assert post.permalink == "test"
+            assert len(post.content_hash) == 32
+    except Exception as e:
+        raise e
+    finally:
+        with db.Session(db.get_db_engine()) as session:
+            session.query(db.RedditPosts).filter_by(id="11AAZZ").delete()
+            session.commit()
+
 
 
 def test_vector_search():
@@ -37,6 +45,12 @@ def test_vector_search():
     assert type(rows) == list
     assert len(rows[0]) == 2
     assert type(rows[0][1]) == int
+    ids = [r[0] for r in rows]
+
+    with db.Session(db.get_db_engine()) as session:
+        posts = session.query(db.Documents).filter(db.Documents.id.in_(ids)).all()
+        assert len(posts) == len(5)
+
 
 
 def test_keywork_search():
