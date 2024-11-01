@@ -18,7 +18,7 @@ def test_insert_reddit_post():
             }
         )
 
-        with db.Session(db.get_db_engine()) as session:
+        with db.Session(db.engine) as session:
             post = session.query(db.RedditPosts).filter_by(id="11AAZZ").first()
             assert post.title == "What do you think about this?"
             assert post.description == "This is a test post"
@@ -31,7 +31,7 @@ def test_insert_reddit_post():
     except Exception as e:
         raise e
     finally:
-        with db.Session(db.get_db_engine()) as session:
+        with db.Session(db.engine) as session:
             session.query(db.RedditPosts).filter_by(id="11AAZZ").delete()
             session.commit()
 
@@ -47,7 +47,7 @@ def test_vector_search():
     assert type(rows[0][1]) == int
     ids = [r[0] for r in rows]
 
-    with db.Session(db.get_db_engine()) as session:
+    with db.Session(db.engine) as session:
         posts = session.query(db.Documents).filter(db.Documents.id.in_(ids)).all()
         assert len(posts) == len(5)
 

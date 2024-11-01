@@ -348,7 +348,7 @@ def is_post_modified(post_id: str) -> bool:
     Returns True if a Reddit post has been modified since it was loaded into the database.
     """
     logger.info(f"Checking if post {post_id} has been modified.")
-    with Session(get_db_engine()) as session:
+    with Session(engine) as session:
         db_post = session.query(RedditPosts).filter_by(id=post_id).first()
 
     reddit_post = reddit.get_post_from_id(post_id)
