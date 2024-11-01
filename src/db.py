@@ -266,7 +266,8 @@ def vector_search(text_query: str, limit: int) -> list[tuple]:
     ORDER BY embedding <=> %(vector)s::vector ASC
     LIMIT %(limit)s;
     """
-    vector = rag.get_embedding(text_query)
+    client = rag.ThrottledOpenAI()
+    vector = client.get_embedding(text_query)
     cursor = get_cursor()
     cursor.execute(query, {"vector": vector, "limit": limit})
     result = cursor.fetchall()
@@ -330,7 +331,7 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
             FULL OUTER JOIN fulltext_search ON vector_search.id = fulltext_search.id
             ORDER BY score DESC
         )
-        SELECT hybrid_search.id, title, score, content
+        SELECT hybrid_search.id, title, hybrid_search.score, content
         FROM hybrid_search
         LEFT JOIN documents ON hybrid_search.id = documents.id
         LEFT JOIN posts ON documents.post_id = posts.id

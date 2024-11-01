@@ -1,14 +1,13 @@
 import os
 from openai import OpenAI
 import tiktoken
+import time
 
 from src import db
 
 ENCODER = os.getenv("OPENAI_ENCODER")
 EMBEDDING_MODEL_NAME = os.getenv("OPENAI_EMBEDDING_MODEL")
 TOKEN_LIMIT = int(os.getenv("OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT"))
-OPENAI_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 
 system_prompt = """
 You are an intelligent assistant that answers questions based on provided
@@ -67,63 +66,81 @@ def check_token_limit(string: str) -> int:
         )
 
 
-def get_embedding(string: str) -> list[float]:
-    """Get the embedding for a string using the specified OpenAI client."""
-    response = OPENAI_CLIENT.embeddings.create(model=EMBEDDING_MODEL_NAME, input=string)
+class ThrottledOpenAI:
+    """Class that wraps the OpenAI client to avoid rate limiting errors."""
 
-    return response.data[0].embedding
+    def __init__(self):
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._remaining_requests = None
 
-
-def rag_query(question: str) -> str:
-    sources: list[tuple] = db.hybrid_search(question, limit=5)
-
-    # Recall output from db.hybrid_search is in the form (id, title, score, content)
-    parsed_sources = []
-    for source in sources:
-        post_id = source[0]
-        title = source[1]
-        body = source[3]
-
-        if body.startswith(title):
-            body = body[len(title) :].strip()
-
-        parsed_sources.append((post_id, title, body))
-
-    # Generate prompt with context
-    prompt = (
-        f"Based on the following context, answer the user's question.\n"
-        f"Question: {question}\n\n"
-        f"Context:\n\n"
-    )
-
-    for post_id, title, body in parsed_sources:
-        prompt += f"Post ID: {post_id}\nTitle: {title}\nBody: {body}\n\n"
-
-    with open("prompt.txt", "w") as f:
-        f.write(prompt)
-
-    # Check prompt token limit
-    n_tokens = get_num_tokens_from_string(prompt)
-    if n_tokens > 100_000:
-        raise ValueError(
-            f"Prompt is too big. Number of tokens is {n_tokens}."
+    def get_embedding(self, string: str) -> list[float]:
+        """Get the embedding for a string using the specified OpenAI client."""
+        response = self.client.embeddings.with_raw_response.create(
+            model=EMBEDDING_MODEL_NAME, input=string
         )
 
-    completion = OPENAI_CLIENT.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": f'{system_prompt}\n{follow_up_questions_prompt}'},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.0,
-    )
+        if response.status_code == 200:
+            x = response.headers.get('x-ratelimit-remaining-requests')
+            # caveman rate limiting
+            if int(x) > 50:
+                time.sleep(5)
 
-    import json
-    with open("response.json", "w") as f:
-        f.write(json.dumps(completion.to_dict(), indent=4))
+            return response.parse().data[0].embedding
+        else:
+            raise ValueError(f"Error getting embedding: {response.errors}")
 
-    response = completion.choices[0].message.content
+    def rag_query(self, question: str) -> str:
+        sources: list[tuple] = db.hybrid_search(question, limit=5)
 
-    response = response.replace('[[info1.txt]]', '""')
-    response = response.replace('[[info2.pdf]]', '""')
-    return response
+        # Recall output from db.hybrid_search is in the form (id, title, score, content)
+        parsed_sources = []
+        for source in sources:
+            post_id = source[0]
+            title = source[1]
+            body = source[3]
+
+            if body.startswith(title):
+                body = body[len(title) :].strip()
+
+            parsed_sources.append((post_id, title, body))
+
+        # Generate prompt with context
+        prompt = (
+            f"Based on the following context, answer the user's question.\n"
+            f"Question: {question}\n\n"
+            f"Context:\n\n"
+        )
+
+        for post_id, title, body in parsed_sources:
+            prompt += f"Post ID: {post_id}\nTitle: {title}\nBody: {body}\n\n"
+
+        with open("prompt.txt", "w") as f:
+            f.write(prompt)
+
+        # Check prompt token limit
+        n_tokens = get_num_tokens_from_string(prompt)
+        if n_tokens > 100_000:
+            raise ValueError(f"Prompt is too big. Number of tokens is {n_tokens}.")
+
+        completion = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{system_prompt}\n{follow_up_questions_prompt}",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+        )
+
+        import json
+
+        with open("response.json", "w") as f:
+            f.write(json.dumps(completion.to_dict(), indent=4))
+
+        response = completion.choices[0].message.content
+
+        response = response.replace("[[info1.txt]]", '""')
+        response = response.replace("[[info2.pdf]]", '""')
+        return response
