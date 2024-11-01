@@ -33,6 +33,7 @@ connection_string = (
     f'@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
 )
 engine = create_engine(connection_string, pool_size=20)
+llm_client = rag.ThrottledOpenAI()
 
 Base = declarative_base()
 
@@ -244,7 +245,7 @@ def insert_documents_from_comments_body(
                 post_id=post_id,
                 chunk_id=chunk_id,
                 content=chunk_content,
-                embedding=rag.get_embedding(chunk_content),
+                embedding=llm_client.get_embedding(chunk_content),
             )
             session.add(d)
             session.commit()
@@ -266,8 +267,7 @@ def vector_search(text_query: str, limit: int) -> list[tuple]:
     ORDER BY embedding <=> %(vector)s::vector ASC
     LIMIT %(limit)s;
     """
-    client = rag.ThrottledOpenAI()
-    vector = client.get_embedding(text_query)
+    vector = llm_client.get_embedding(text_query)
     cursor = get_cursor()
     cursor.execute(query, {"vector": vector, "limit": limit})
     result = cursor.fetchall()
