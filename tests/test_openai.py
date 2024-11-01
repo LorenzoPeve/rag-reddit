@@ -28,7 +28,8 @@ def test_check_token_limit():
 def test_get_embedding():
 
     test_string = "Hello, world!"
-    embeddings = rag.get_embedding(test_string)
+    client = rag.ThrottledOpenAI()
+    embeddings = client.get_embedding(test_string)
     assert isinstance(embeddings, list)
     assert len(embeddings) == 1536
 
@@ -36,11 +37,14 @@ def test_get_embedding():
 def test_get_embedding_2():
 
     test_string = "What are key features of a good data engineering team?"
-    embeddings = rag.get_embedding(test_string)
+    client = rag.ThrottledOpenAI()
+    embeddings = client.get_embedding(test_string)
     assert isinstance(embeddings, list)
     assert len(embeddings) == 1536
 
 def test_rag_query():
     question = "Currently, what is the best API for web scraping large swaths of data?"
-    response = rag.rag_query(question)
+    client = rag.ThrottledOpenAI()
+    response = client.rag_query(question)
+    print(response)
     # assert type(respon)
