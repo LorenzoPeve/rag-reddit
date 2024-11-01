@@ -24,7 +24,7 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP"))
 
 def delete_post(post_id: str):
     logging.info(f"Deleting existing post: {post_id}")
-    with Session(db.get_db_engine()) as session:
+    with Session(db.engine) as session:
         session.query(RedditPosts).filter_by(id=post_id).delete()
         session.commit()
 
@@ -37,7 +37,7 @@ def insert_reddit_post_and_comments(p: dict) -> None:
     If the post already exists and has been modified, the existing post is
     deleted and a new post is inserted. Otherwise, the post is skipped.
     """
-    with Session(db.get_db_engine()) as session:
+    with Session(db.engine) as session:
         db_post = session.query(RedditPosts).filter_by(id=p["id"]).first()
 
     if db_post is None:
@@ -72,7 +72,7 @@ def insert_reddit_posts(posts: list[dict]):
         except Exception as e:
             logging.error(f"Error processing post: {p['id']}. Error: {e}")
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(process_post, p) for p in posts]
 
         for f in as_completed(futures):
@@ -83,21 +83,23 @@ def lambda_handler(event, context):
     logging.info("Lambda function starting")
     logging.info("Function starting")
 
+    iterations = event["iterations"]
+    t = event["t"]
+    n = event["n"]
+
     retrieved = 0
     after = None
-    for i in range(10):
+    for i in range(iterations):
         logging.info(f"Fetching top posts from r/dataengineering {i}")
-        posts = reddit.get_top_posts(
-            "dataengineering", limit=50, t=event, after=after
-        )
+        posts = reddit.get_top_posts("dataengineering", limit=n, t=t, after=after)
         after = "t3_" + posts[-1]["id"]
         insert_reddit_posts(posts)
         retrieved += len(posts)
         time.sleep(5)
 
     logging.info("Function completed")
-    return f'Retrieved best {retrieved} posts for the {event}.'
+    return f"Retrieved best {retrieved} posts for the {t}."
 
 
 if __name__ == "__main__":
-    print(lambda_handler('all', None))
+    print(lambda_handler({"t": "year", "iterations": 1, "n": 10}, None))
