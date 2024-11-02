@@ -24,7 +24,9 @@ import psycopg
 
 from src import reddit, rag
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,7 @@ engine = create_engine(connection_string, pool_size=20)
 llm_client = rag.ThrottledOpenAI()
 
 Base = declarative_base()
+
 
 class RedditPosts(Base):
     __tablename__ = "posts"
@@ -99,7 +102,6 @@ def get_cursor():
 
 
 def init_schema() -> None:
-    
 
     with Session(engine) as session:
         session.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
@@ -171,7 +173,6 @@ def insert_reddit_post(p: dict) -> None:
         None
     """
     assert type(p) == dict
-    
 
     # Get all comments in the post and calculate the hash value
     # DEV NOTE: This allows us to check if the post has been modified
@@ -214,7 +215,6 @@ def insert_documents_from_comments_body(
     Returns:
         None
     """
-    
 
     with Session(engine) as session:
         post = session.query(RedditPosts).filter_by(id=post_id).first()
@@ -303,15 +303,62 @@ def keyword_search(text_query: str, limit: int) -> list[tuple]:
     return result
 
 
+def keyword_search_match_all(text_query: str, limit: int) -> list[tuple]:
+    """
+    Performs a full-text search on the content of the documents where all the
+    words in the query must be present in the document.
+    """
+    query = """
+    SELECT
+        id,
+        RANK () OVER (
+            ORDER BY ts_rank_cd(
+                content_ts_vector,
+                plainto_tsquery('english', %(text_query)s)
+            ) DESC
+        ) AS rank
+    FROM documents
+    WHERE
+        content_ts_vector @@
+        plainto_tsquery('english', %(text_query)s)
+    ORDER BY rank
+    LIMIT %(limit)s;
+    """
+    cursor = get_cursor()
+    cursor.execute(query, {"text_query": text_query, "limit": limit})
+    result = cursor.fetchall()
+    cursor.close()
+    return result
+
+
 def hybrid_search(text_query: str, limit: int) -> list[tuple]:
-    """Performs a hybrid search using both full-text search and vector search."""
+    """
+    Performs a hybrid search. Hybrid search combines:
+        - vector search
+        - full-text search for exact matches
+        - full-text search for partial matches
+
+    using both full-text search and vector search."""
 
     keyword_results = keyword_search(text_query, limit)
     vector_results = vector_search(text_query, limit)
+    exact_keyword_results = keyword_search_match_all(text_query, limit)
 
     # Convert results into a format suitable for use in a SQL query
     keyword_query = ", ".join([f"('{id}', {rank})" for id, rank in keyword_results])
     vector_query = ", ".join([f"('{id}', {rank})" for id, rank in vector_results])
+    exact_keyword_query = ", ".join(
+        [f"('{id}', {rank})" for id, rank in exact_keyword_results]
+    )
+
+    # Address edge case where no results are returned for exact keyword search
+    if len(exact_keyword_query) == 0:
+        exact_keyword_query = "('null', 0)"
+        k_vector, k_fs, k_exact = 60, 60, 60
+    else:
+        k_vector, k_fs, k_exact = 60, 60 * 3, 60
+
+    print(exact_keyword_query)
 
     hybrid_query = f"""
         WITH vector_search AS (
@@ -322,13 +369,20 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
             SELECT *
             FROM (VALUES {keyword_query}) AS k(id, rank)
         ),
+        exact_fulltext_search AS (
+            SELECT *
+            FROM (VALUES {exact_keyword_query}) AS k(id, rank)
+            WHERE id != 'null'
+        ),
         hybrid_search AS (
             SELECT
-                COALESCE(vector_search.id, fulltext_search.id) AS id,
-                COALESCE(1.0 / (%(k)s + vector_search.rank), 0.0) +
-                COALESCE(1.0 / (%(k)s + fulltext_search.rank), 0.0) AS score
+                COALESCE(vector_search.id, fulltext_search.id, exact_fulltext_search.id) AS id,
+                COALESCE(1.0 / (%(k_vector)s + vector_search.rank), 0.0) +
+                COALESCE(1.0 / (%(k_fs)s + fulltext_search.rank), 0.0) +
+                COALESCE(1.0 / (%(k_exact)s + exact_fulltext_search.rank), 0.0) AS score
             FROM vector_search
             FULL OUTER JOIN fulltext_search ON vector_search.id = fulltext_search.id
+            FULL OUTER JOIN exact_fulltext_search ON vector_search.id = exact_fulltext_search.id
             ORDER BY score DESC
         )
         SELECT hybrid_search.id, title, hybrid_search.score, content
@@ -336,9 +390,14 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
         LEFT JOIN documents ON hybrid_search.id = documents.id
         LEFT JOIN posts ON documents.post_id = posts.id
         ORDER BY score DESC
+        LIMIT %(limit)s;
     """
+
     cursor = get_cursor()
-    cursor.execute(hybrid_query, {"k": 60})
+    cursor.execute(
+        hybrid_query,
+        {"k_vector": k_vector, "k_fs": k_fs, "k_exact": k_exact, "limit": limit},
+    )
     result = cursor.fetchall()
     cursor.close()
     return result
@@ -383,7 +442,7 @@ def get_posts_without_documents() -> list[RedditPosts]:
     Returns:
         list[RedditPosts]: A list of RedditPosts objects that do not have any associated documents.
     """
-    
+
     with Session(engine) as session:
         posts_without_docs = (
             session.query(RedditPosts)
