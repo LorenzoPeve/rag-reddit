@@ -89,7 +89,7 @@ def lambda_handler(event, context):
         retrieved += len(posts)
         time.sleep(5)
 
-    print("Function completed")
+    print(f"Function completed for {event}")
     msg = f"Retrieved best {retrieved} posts for the {t}."
     print(msg)
     return msg
