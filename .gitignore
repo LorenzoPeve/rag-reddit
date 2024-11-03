@@ -134,3 +134,8 @@ __blobstorage__
 __queuestorage__
 __azurite_db*__.json
 .python_packages
+prompt.txt
+.env.dev
+response.json
+scrap.py
+test.txt
