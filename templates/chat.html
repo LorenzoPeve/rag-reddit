@@ -206,24 +206,77 @@
         .suggested-questions {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 12px;
+            margin-top: 16px;
+            position: relative;
+        }
+
+        .suggested-questions::before {
+            content: "Suggested questions";
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-style: italic;
+            opacity: 0.8;
         }
 
         .suggested-question {
-            background-color: var(--user-message-bg);
-            padding: 10px 16px;
+            background-color: transparent;
+            padding: 8px 14px;
             border-radius: 12px;
-            font-size: 0.9rem;
-            color: var(--text-color);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
             cursor: pointer;
             transition: all 0.2s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-style: italic;
+            position: relative;
+            padding-left: 24px;
+            opacity: 0.9;
+        }
+
+        .suggested-question::before {
+            content: "→";
+            position: absolute;
+            left: 10px;
+            opacity: 0.6;
+            transition: all 0.2s ease;
         }
 
         .suggested-question:hover {
-            background-color: var(--accent-color);
+            background-color: rgba(88, 101, 242, 0.1);
+            border-color: rgba(88, 101, 242, 0.3);
+            color: var(--text-color);
             transform: translateX(4px);
+        }
+
+        .suggested-question:hover::before {
+            opacity: 1;
+            color: var(--accent-color);
+        }
+
+        /* Add subtle animation for questions appearing */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .suggested-question {
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .suggested-questions .suggested-question:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .suggested-questions .suggested-question:nth-child(3) {
+            animation-delay: 0.2s;
         }
 
 
