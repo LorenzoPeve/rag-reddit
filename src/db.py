@@ -358,8 +358,6 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
     else:
         k_vector, k_fs, k_exact = 60, 60 * 3, 60
 
-    print(exact_keyword_query)
-
     hybrid_query = f"""
         WITH vector_search AS (
             SELECT *
