@@ -1,5 +1,6 @@
 from src import db
 
+
 def test_insert_reddit_post():
 
     try:
@@ -13,8 +14,8 @@ def test_insert_reddit_post():
                 "link_flair_text": "test",
                 "num_comments": 14,
                 "permalink": "test",
-                'score': 10,
-                'created': 1620000000,
+                "score": 10,
+                "created": 1620000000,
             }
         )
 
@@ -36,7 +37,6 @@ def test_insert_reddit_post():
             session.commit()
 
 
-
 def test_vector_search():
 
     rows = db.vector_search(
@@ -49,11 +49,10 @@ def test_vector_search():
 
     with db.Session(db.engine) as session:
         posts = session.query(db.Documents).filter(db.Documents.id.in_(ids)).all()
-        assert len(posts) == len(5)
+        assert len(posts) == 5
 
 
-
-def test_keywork_search():
+def test_keyword_search():
 
     rows = db.keyword_search("What are key features of a snowflake", limit=5)
     assert type(rows) == list
@@ -61,15 +60,36 @@ def test_keywork_search():
     assert type(rows[0][1]) == int
 
 
+def test_keyword_search_match_all():
+    query = "What are key features of argentina with snowflake"
+
+    rows = db.keyword_search(query, limit=5)
+    assert type(rows) == list
+    assert len(rows[0]) == 2
+    assert type(rows[0][1]) == int
+
+    # DEV NOTE: This test is expected to fail because the query is too specific
+    rows = db.keyword_search_match_all(query, limit=5)
+    assert len(rows) == 0
+
+
 def test_hybrid_search():
 
-    rows = db.hybrid_search("What are key features of a snowflake", limit=5)
+    rows = db.hybrid_search("What are key features of a snowflake Argentina", limit=5)
+
     assert type(rows) == list
-    assert len(rows[0]) == 4
+    assert len(rows) == 5  # 5 rows
+    assert len(rows[0]) == 4  # 4 columns
+
+    # check id attribute
     assert type(rows[0][0]) == str
     assert "_" in rows[0][0]
+
+    # check title and score attributes
     assert type(rows[0][1]) == str
     assert float(rows[0][2]) > 0
+
+    # check content attribute
     assert type(rows[0][3]) == str
     assert len(rows[0][3]) > 100
 
