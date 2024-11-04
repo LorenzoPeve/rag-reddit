@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, Response, request, jsonify
 from functools import wraps
 import logging
 from datetime import datetime
@@ -32,15 +32,10 @@ def chat():
     message = data.get('message', '').strip()
     
     if not message:
-        return jsonify({"error": "Message cannot be empty"}), 400
-        
-    # Get response using RAG
-    response = llm_client.rag_query(message)
-    
-    return jsonify({
-        "response": response,
-        "timestamp": datetime.utcnow().isoformat()
-    })
+        return jsonify({"error": "Message cannot be empty"}), 400        
+   
+    return Response(llm_client.rag_query(message), mimetype='text/event-stream')
+
 
 if __name__ == '__main__':
     app.run(debug=True)
