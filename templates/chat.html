@@ -405,20 +405,24 @@
             animation: bounce 1.4s infinite ease-in-out;
         }
 
-        .message.assistant-message .loading-dots span:nth-child(2) { 
-            animation-delay: 0.2s; 
+        .message.assistant-message .loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
         }
-        
-        .message.assistant-message .loading-dots span:nth-child(3) { 
-            animation-delay: 0.4s; 
+
+        .message.assistant-message .loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
         }
 
         @keyframes bounce {
-            0%, 80%, 100% { 
-                transform: translateY(0); 
+
+            0%,
+            80%,
+            100% {
+                transform: translateY(0);
             }
-            40% { 
-                transform: translateY(-8px); 
+
+            40% {
+                transform: translateY(-8px);
             }
         }
     </style>
@@ -500,12 +504,12 @@
             const messagesDiv = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
-            
+
             if (isUser) {
                 messageDiv.innerHTML = `<div class="message-content">${message}</div>`;
                 messagesDiv.appendChild(messageDiv);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                
+
                 try {
                     showLoadingDots();
 
@@ -533,15 +537,24 @@
 
                         const { value, done } = await reader.read();
                         if (done) break;
-                        
+
                         const text = new TextDecoder().decode(value);
                         fullText += text;
                         contentDiv.textContent = fullText;
                         messagesDiv.scrollTop = messagesDiv.scrollHeight;
                     }
 
-                // Scroll to bottom
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                    // Process questions and markdown after stream is complete
+                    const { cleanText, questions } = extractSuggestedQuestions(fullText);
+                    contentDiv.innerHTML = marked.parse(cleanText);
+
+                    if (questions.length > 0) {
+                        const questionsContainer = createSuggestedQuestions(questions);
+                        assistantDiv.appendChild(questionsContainer);
+                    }
+
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
                 } catch (error) {
                     removeLoadingDots();
                     console.error('Error:', error);
@@ -558,14 +571,14 @@
         async function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
-            
+
             if (!message) return;
-            
+
             // Clear input and error
             messageInput.value = '';
             document.getElementById('error-message').textContent = '';
             messageInput.style.height = 'auto';
-            
+
             // Send message and handle response
             await addMessage(message, true);
             messageInput.focus();
@@ -574,17 +587,17 @@
         function showLoadingDots() {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant-message';
-            
+
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'loading-dots';
             loadingDiv.id = 'loading-dots';
-            
+
             // Add the three bouncing dots
             for (let i = 0; i < 3; i++) {
                 const span = document.createElement('span');
                 loadingDiv.appendChild(span);
             }
-            
+
             messageDiv.appendChild(loadingDiv);
             document.getElementById('chat-messages').appendChild(messageDiv);
         }
