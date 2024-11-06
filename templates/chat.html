@@ -525,12 +525,17 @@
                     assistantDiv.className = 'message assistant-message';
                     const contentDiv = document.createElement('div');
                     contentDiv.className = 'message-content';
-                    contentDiv.style.whiteSpace = 'pre-wrap';  // Preserve line breaks
+                    contentDiv.style.whiteSpace = 'pre-wrap';
                     assistantDiv.appendChild(contentDiv);
                     messagesDiv.appendChild(assistantDiv);
 
                     const reader = response.body.getReader();
                     let fullText = '';
+                    let mainContent = '';
+                    let citationsSection = '';
+                    let followUpSection = '';
+                    let inCitations = false;
+                    let inFollowUp = false;
 
                     while (true) {
                         removeLoadingDots();
@@ -540,17 +545,66 @@
 
                         const text = new TextDecoder().decode(value);
                         fullText += text;
-                        contentDiv.textContent = fullText;
+
+                        // Split content based on sections
+                        if (fullText.includes('Citations:')) {
+                            const parts = fullText.split('Citations:');
+                            mainContent = parts[0];
+                            const remainder = parts[1] || '';
+                            
+                            if (remainder.includes('Follow-up Questions:')) {
+                                const citationParts = remainder.split('Follow-up Questions:');
+                                citationsSection = citationParts[0];
+                                followUpSection = citationParts[1];
+                                inFollowUp = true;
+                            } else {
+                                citationsSection = remainder;
+                            }
+                            inCitations = true;
+                            
+                            // Display only the main content while streaming
+                            contentDiv.innerHTML = marked.parse(mainContent);
+                        } else if (!inCitations) {
+                            // If we haven't hit citations yet, stream normally
+                            contentDiv.innerHTML = marked.parse(fullText);
+                        }
+
                         messagesDiv.scrollTop = messagesDiv.scrollHeight;
                     }
 
-                    // Process questions and markdown after stream is complete
-                    const { cleanText, questions } = extractSuggestedQuestions(fullText);
-                    contentDiv.innerHTML = marked.parse(cleanText);
+                    // Once streaming is complete, format and append citations and questions
+                    let finalHtml = mainContent;
 
-                    if (questions.length > 0) {
-                        const questionsContainer = createSuggestedQuestions(questions);
-                        assistantDiv.appendChild(questionsContainer);
+                    if (citationsSection) {
+                        // Format citations (bold the numbers)
+                        const formattedCitations = 'Citations: ' + citationsSection.replace(
+                            /\[(\d+)\]/g, 
+                            '**[$1]**'
+                        );
+                        finalHtml += '\n\n' + formattedCitations;
+                    }
+
+                    if (followUpSection) {
+                        // Extract and format questions
+                        const { questions } = extractSuggestedQuestions(followUpSection);
+                        if (questions.length > 0) {
+                            finalHtml += '\n\nFollow-up Questions:\n';
+                            questions.forEach(q => {
+                                finalHtml += `*${q}*\n`;
+                            });
+                        }
+                    }
+
+                    // Update the final content with everything formatted
+                    contentDiv.innerHTML = marked.parse(finalHtml);
+
+                    // Add clickable questions if present
+                    if (followUpSection) {
+                        const { questions } = extractSuggestedQuestions(followUpSection);
+                        if (questions.length > 0) {
+                            const questionsContainer = createSuggestedQuestions(questions);
+                            assistantDiv.appendChild(questionsContainer);
+                        }
                     }
 
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
