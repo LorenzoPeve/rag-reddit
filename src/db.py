@@ -251,6 +251,19 @@ def insert_documents_from_comments_body(
             session.commit()
 
 
+def get_posts_url(ids: list[str]) -> dict[str, str]:
+
+    with Session(engine) as session:
+        posts = (
+            session.query(RedditPosts)
+            .filter(RedditPosts.id.in_(ids))
+            .order_by(RedditPosts.id.asc())
+            .all()
+        )
+
+    return {post.id: post.permalink for post in posts}
+
+
 def vector_search(text_query: str, limit: int) -> list[tuple]:
     """
     Returns the id and rank of the most semantically similar documents to the
@@ -338,8 +351,8 @@ def hybrid_search(text_query: str, limit: int) -> list[tuple]:
         - full-text search for exact matches
         - full-text search for partial matches
 
-    using both full-text search and vector search."""
-
+    using both full-text search and vector search.
+    """
     keyword_results = keyword_search(text_query, limit)
     vector_results = vector_search(text_query, limit)
     exact_keyword_results = keyword_search_match_all(text_query, limit)
