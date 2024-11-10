@@ -1,5 +1,6 @@
 import pytest
-from src import rag
+
+from src import db, rag
 
 
 def test_get_num_tokens_from_string():
@@ -46,5 +47,4 @@ def test_rag_query():
     question = "Currently, what is the best API for web scraping large swaths of data?"
     client = rag.ThrottledOpenAI()
     response = client.rag_query(question)
-    print(response)
-    # assert type(respon)
+    response_list = list(response)
