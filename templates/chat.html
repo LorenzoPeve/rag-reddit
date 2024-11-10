@@ -177,6 +177,26 @@
             padding: 0;
         }
 
+        .message.assistant-message a {
+    text-decoration: none;  /* Remove underline */
+    color: inherit;  /* Use parent text color */
+    background-color: rgba(88, 101, 242, 0.1);  /* Light accent color background */
+    padding: 2px 6px;  /* Add some padding around the text */
+    border-radius: 4px;  /* Rounded corners */
+    transition: background-color 0.2s ease;  /* Smooth hover effect */
+}
+
+.message.assistant-message a:hover {
+    background-color: rgba(88, 101, 242, 0.2);  /* Slightly darker on hover */
+}
+
+/* Style for citation numbers specifically */
+.message.assistant-message strong {
+    color: var(--accent-color);
+    font-weight: 600;
+    margin-right: 4px;  /* Add small gap after citation number */
+}
+
         .input-container {
             padding: 20px;
             background: var(--chat-bg);
@@ -285,8 +305,7 @@
         .suggested-questions {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-top: 16px;
+            margin-top: 0px;
             position: relative;
         }
 
@@ -493,11 +512,34 @@
             return container;
         }
 
+        function extractPostIds(text) {
+            const regex = /\[\[([a-zA-Z0-9_]+)\]\]/g;
+            const matches = [...text.matchAll(regex)];
+            return matches.map(match => match[1]);
+        }
+
         marked.use({
             breaks: true,
             gfm: true,
             pedantic: false,
-            smartLists: true
+            smartLists: true,
+            renderer: {
+                link(href, title, text) {
+                    return `<a href="${href}" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style="
+                            background-color: rgba(88, 101, 242, 0.15); 
+                            padding: 2px 6px; 
+                            border-radius: 4px; 
+                            text-decoration: none; 
+                            color: inherit;
+                            transition: all 0.2s ease;"
+                        onmouseover="this.style.textDecoration='underline';this.style.backgroundColor='rgba(88, 101, 242, 0.25)'" 
+                        onmouseout="this.style.textDecoration='none';this.style.backgroundColor='rgba(88, 101, 242, 0.15)'"
+                        >${text}</a>`;
+                }
+            }
         });
 
         async function addMessage(message, isUser = false) {
@@ -525,12 +567,17 @@
                     assistantDiv.className = 'message assistant-message';
                     const contentDiv = document.createElement('div');
                     contentDiv.className = 'message-content';
-                    contentDiv.style.whiteSpace = 'pre-wrap';  // Preserve line breaks
+                    contentDiv.style.whiteSpace = 'pre-wrap';
                     assistantDiv.appendChild(contentDiv);
                     messagesDiv.appendChild(assistantDiv);
 
                     const reader = response.body.getReader();
                     let fullText = '';
+                    let mainContent = '';
+                    let citationsSection = '';
+                    let followUpSection = '';
+                    let inCitations = false;
+                    let inFollowUp = false;
 
                     while (true) {
                         removeLoadingDots();
@@ -540,17 +587,60 @@
 
                         const text = new TextDecoder().decode(value);
                         fullText += text;
-                        contentDiv.textContent = fullText;
+
+                        // Split content based on sections
+                        if (fullText.includes('Citations:')) {
+                            const parts = fullText.split('Citations:');
+                            mainContent = parts[0];
+                            const remainder = parts[1] || '';
+
+                            if (remainder.includes('Follow-up Questions:')) {
+                                const citationParts = remainder.split('Follow-up Questions:');
+                                citationsSection = citationParts[0];
+                                followUpSection = citationParts[1];
+                                inFollowUp = true;
+                            } else {
+                                citationsSection = remainder;
+                            }
+                            inCitations = true;
+
+                            // Display only the main content while streaming
+                            contentDiv.innerHTML = marked.parse(mainContent);
+                        } else if (!inCitations) {
+                            // If we haven't hit citations yet, stream normally
+                            contentDiv.innerHTML = marked.parse(fullText);
+                        }
+
                         messagesDiv.scrollTop = messagesDiv.scrollHeight;
                     }
 
-                    // Process questions and markdown after stream is complete
-                    const { cleanText, questions } = extractSuggestedQuestions(fullText);
-                    contentDiv.innerHTML = marked.parse(cleanText);
+                    // Once streaming is complete, format and append citations and questions
+                    let finalHtml = mainContent;
 
-                    if (questions.length > 0) {
-                        const questionsContainer = createSuggestedQuestions(questions);
-                        assistantDiv.appendChild(questionsContainer);
+                    if (citationsSection) {
+                        // Format citations (bold the numbers)
+                        const formattedCitations = '*Citations:*\n' + citationsSection.trim().replace(
+                            /\[(\d+)\]/g,
+                            '**[$1]**'
+                        );
+                        const processedCitations = await replacePostIdsWithLinks(
+                            contentDiv,
+                            finalHtml + '\n' + formattedCitations
+                        );
+
+                        finalHtml = processedCitations;
+                    }
+
+                    // Update the final content with everything formatted
+                    contentDiv.innerHTML = marked.parse(finalHtml);
+
+                    // Add clickable questions if present
+                    if (followUpSection) {
+                        const { questions } = extractSuggestedQuestions(followUpSection);
+                        if (questions.length > 0) {
+                            const questionsContainer = createSuggestedQuestions(questions);
+                            assistantDiv.appendChild(questionsContainer);
+                        }
                     }
 
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -609,10 +699,47 @@
             }
         }
 
+        async function replacePostIdsWithLinks(contentDiv, text) {
+            const postIds = extractPostIds(text);
+
+            if (postIds.length === 0) return text;
+
+            try {
+                const response = await fetch('/api/find_ids', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ post_ids: postIds })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch post URLs');
+                }
+
+                const data = await response.json();
+                let processedText = text;
+
+                // Replace each post ID with a hyperlink
+                Object.entries(data.urls).forEach(([postId, url]) => {
+                    const regex = new RegExp(`"([^"]+)"\\[\\[${postId}\\]\\]`, 'g');
+                    const fullUrl = `https://www.reddit.com${url}`;
+                    processedText = processedText.replace(
+                        regex,
+                        `[$1](${fullUrl})`  // Make the title itself a Markdown link
+                    );
+                });
+
+                return processedText;
+            } catch (error) {
+                console.error('Error fetching post URLs:', error);
+                return text;
+            }
+        }
+
+
         // Initial focus
         messageInput.focus();
-
-
 
     </script>
 </body>
