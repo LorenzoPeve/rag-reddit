@@ -175,7 +175,7 @@ class ThrottledOpenAI:
             raise ValueError(f"Prompt is too big. Number of tokens is {n_tokens}.")
 
         stream = self.client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
