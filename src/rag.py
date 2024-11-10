@@ -132,7 +132,7 @@ class ThrottledOpenAI:
         )
 
         if response.status_code == 200:
-            x = response.headers.get('x-ratelimit-remaining-requests')
+            x = response.headers.get("x-ratelimit-remaining-requests")
             # caveman rate limiting
             if int(x) > 50:
                 time.sleep(5)
@@ -165,8 +165,8 @@ class ThrottledOpenAI:
 
         for post_id, title, body in parsed_sources:
             prompt += f"Post ID: {post_id}\nTitle: {title}\nBody: {body}\n\n"
-       
-        with open("prompt.txt", "w", encoding='utf-8') as f:
+
+        with open("prompt.txt", "w", encoding="utf-8") as f:
             f.write(prompt)
 
         # Check prompt token limit
@@ -184,7 +184,7 @@ class ThrottledOpenAI:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            stream=True  # Enable streaming
+            stream=True,  # Enable streaming
         )
 
         # Stream the response chunks

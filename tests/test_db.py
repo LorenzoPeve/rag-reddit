@@ -38,21 +38,21 @@ def test_insert_reddit_post():
 
 
 def test_get_posts_url():
-    urls = db.get_posts_url(["1cx4mbl", "1dxpqvk"])
+    urls = db.get_posts_url(["1arwf4u", "1brqa92"])
     assert type(urls) == dict
     assert len(urls) > 0
     assert urls == {
-        "1cx4mbl": "/r/dataengineering/comments/1cx4mbl/do_you_guys_think_he_has_a_point/",
-        "1dxpqvk": "/r/dataengineering/comments/1dxpqvk/sales_of_vibrators_spike_every_august/",
+        "1arwf4u": "/r/dataengineering/comments/1arwf4u/had_an_onsite_interview_with_one_of_faang_all_6/",
+        "1brqa92": "/r/dataengineering/comments/1brqa92/is_this_chart_accurate/",
     }
 
     # checks urls are returned in alphabetical order
-    urls = db.get_posts_url(["1dxpqvk", "1cx4mbl"])
+    urls = db.get_posts_url(["1brqa92", "1arwf4u"])
     assert type(urls) == dict
     assert len(urls) > 0
     assert urls == {
-        "1cx4mbl": "/r/dataengineering/comments/1cx4mbl/do_you_guys_think_he_has_a_point/",
-        "1dxpqvk": "/r/dataengineering/comments/1dxpqvk/sales_of_vibrators_spike_every_august/",
+        "1arwf4u": "/r/dataengineering/comments/1arwf4u/had_an_onsite_interview_with_one_of_faang_all_6/",
+        "1brqa92": "/r/dataengineering/comments/1brqa92/is_this_chart_accurate/",
     }
 
 
@@ -98,19 +98,23 @@ def test_hybrid_search():
 
     assert type(rows) == list
     assert len(rows) == 5  # 5 rows
-    assert len(rows[0]) == 4  # 4 columns
+    assert len(rows[0]) == 5  # 4 columns
 
-    # check id attribute
+    # check document id attribute
     assert type(rows[0][0]) == str
     assert "_" in rows[0][0]
 
-    # check title and score attributes
+    # check post id attribute
     assert type(rows[0][1]) == str
-    assert float(rows[0][2]) > 0
+    assert len(rows[0][1]) == 7
+
+    # check title and score attributes
+    assert type(rows[0][2]) == str
+    assert float(rows[0][3]) > 0
 
     # check content attribute
-    assert type(rows[0][3]) == str
-    assert len(rows[0][3]) > 100
+    assert type(rows[0][4]) == str
+    assert len(rows[0][4]) > 100
 
 
 def test_is_post_modified():
