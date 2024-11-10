@@ -525,7 +525,19 @@
             smartLists: true,
             renderer: {
                 link(href, title, text) {
-                    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="background-color: rgba(88, 101, 242, 0.1); padding: 2px 6px; border-radius: 4px; text-decoration: none; color: inherit;">${text}</a>`;
+                    return `<a href="${href}" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style="
+                            background-color: rgba(88, 101, 242, 0.15); 
+                            padding: 2px 6px; 
+                            border-radius: 4px; 
+                            text-decoration: none; 
+                            color: inherit;
+                            transition: all 0.2s ease;"
+                        onmouseover="this.style.textDecoration='underline';this.style.backgroundColor='rgba(88, 101, 242, 0.25)'" 
+                        onmouseout="this.style.textDecoration='none';this.style.backgroundColor='rgba(88, 101, 242, 0.15)'"
+                        >${text}</a>`;
                 }
             }
         });
