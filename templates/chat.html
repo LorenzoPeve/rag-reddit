@@ -492,11 +492,22 @@
             return container;
         }
 
+        function extractPostIds(text) {
+            const regex = /\[\[([a-zA-Z0-9_]+)\]\]/g;
+            const matches = [...text.matchAll(regex)];
+            return matches.map(match => match[1]);
+        }
+
         marked.use({
             breaks: true,
             gfm: true,
             pedantic: false,
-            smartLists: true
+            smartLists: true,
+            renderer: {
+                link(href, title, text) {
+                    return `<a href="${href}" target="_blank" style="color: var(--accent-color); text-decoration: underline;">${text}</a>`;
+                }
+            }
         });
 
         async function addMessage(message, isUser = false) {
@@ -550,7 +561,7 @@
                             const parts = fullText.split('Citations:');
                             mainContent = parts[0];
                             const remainder = parts[1] || '';
-                            
+
                             if (remainder.includes('Follow-up Questions:')) {
                                 const citationParts = remainder.split('Follow-up Questions:');
                                 citationsSection = citationParts[0];
@@ -560,7 +571,7 @@
                                 citationsSection = remainder;
                             }
                             inCitations = true;
-                            
+
                             // Display only the main content while streaming
                             contentDiv.innerHTML = marked.parse(mainContent);
                         } else if (!inCitations) {
@@ -577,10 +588,15 @@
                     if (citationsSection) {
                         // Format citations (bold the numbers)
                         const formattedCitations = '*Citations:*\n' + citationsSection.trim().replace(
-                            /\[(\d+)\]/g, 
+                            /\[(\d+)\]/g,
                             '**[$1]**'
                         );
-                        finalHtml += '\n' + formattedCitations;
+                        const processedCitations = await replacePostIdsWithLinks(
+                            contentDiv,
+                            finalHtml + '\n' + formattedCitations
+                        );
+
+                        finalHtml = processedCitations;
                     }
 
                     // Update the final content with everything formatted
@@ -651,10 +667,48 @@
             }
         }
 
+        async function replacePostIdsWithLinks(contentDiv, text) {
+            const postIds = extractPostIds(text);
+
+            if (postIds.length === 0) return text;
+
+            try {
+                const response = await fetch('/api/find_ids', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ post_ids: postIds })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch post URLs');
+                }
+
+                const data = await response.json();
+
+                let processedText = text;
+
+                // Replace each post ID with a hyperlink
+                Object.entries(data.urls).forEach(([postId, url]) => {
+                    const regex = new RegExp(`\\[\\[${postId}\\]\\]`, 'g');
+                    const fullUrl = `https://www.reddit.com${url}`; // Properly concatenate the URL
+                    processedText = processedText.replace(
+                        regex,
+                        `[view post](${fullUrl})`  // Use Markdown link syntax instead of HTML
+                    );
+                });
+
+                return processedText;
+            } catch (error) {
+                console.error('Error fetching post URLs:', error);
+                return text;
+            }
+        }
+
+
         // Initial focus
         messageInput.focus();
-
-
 
     </script>
 </body>
