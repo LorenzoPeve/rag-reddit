@@ -124,12 +124,16 @@ class ThrottledOpenAI:
     def __init__(self):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self._remaining_requests = None
+        self.usage = 0
 
     def get_embedding(self, string: str) -> list[float]:
         """Get the embedding for a string using the specified OpenAI client."""
         response = self.client.embeddings.with_raw_response.create(
             model=EMBEDDING_MODEL_NAME, input=string
         )
+
+        total_tokens = response.parse().usage.total_tokens
+        print(f"Embedding tokens: {total_tokens}")
 
         if response.status_code == 200:
             x = response.headers.get("x-ratelimit-remaining-requests")
@@ -142,6 +146,8 @@ class ThrottledOpenAI:
             raise ValueError(f"Error getting embedding: {response.errors}")
 
     def rag_query(self, question: str) -> str:
+
+        self.usage = 0
         sources: list[tuple] = db.hybrid_search(question, limit=5)
 
         # Recall output from db.hybrid_search is in the form (id, title, score, content)
@@ -173,6 +179,8 @@ class ThrottledOpenAI:
         n_tokens = get_num_tokens_from_string(prompt)
         if n_tokens > 100_000:
             raise ValueError(f"Prompt is too big. Number of tokens is {n_tokens}.")
+        else:
+            print(f"Number of tokens in prompt: {n_tokens}")
 
         stream = self.client.chat.completions.create(
             model="gpt-4o-mini",
@@ -190,4 +198,8 @@ class ThrottledOpenAI:
         # Stream the response chunks
         for chunk in stream:
             if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
+                content = chunk.choices[0].delta.content
+                self.usage += get_num_tokens_from_string(content)
+                yield content
+        else:
+            print(f"Ouput tokens: {self.usage}")
