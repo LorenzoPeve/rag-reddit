@@ -285,8 +285,7 @@
         .suggested-questions {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-top: 16px;
+            margin-top: 0px;
             position: relative;
         }
 
@@ -577,22 +576,11 @@
 
                     if (citationsSection) {
                         // Format citations (bold the numbers)
-                        const formattedCitations = 'Citations: ' + citationsSection.replace(
+                        const formattedCitations = '*Citations:*\n' + citationsSection.trim().replace(
                             /\[(\d+)\]/g, 
                             '**[$1]**'
                         );
-                        finalHtml += '\n\n' + formattedCitations;
-                    }
-
-                    if (followUpSection) {
-                        // Extract and format questions
-                        const { questions } = extractSuggestedQuestions(followUpSection);
-                        if (questions.length > 0) {
-                            finalHtml += '\n\nFollow-up Questions:\n';
-                            questions.forEach(q => {
-                                finalHtml += `*${q}*\n`;
-                            });
-                        }
+                        finalHtml += '\n' + formattedCitations;
                     }
 
                     // Update the final content with everything formatted
