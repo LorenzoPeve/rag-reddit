@@ -37,6 +37,25 @@ def test_insert_reddit_post():
             session.commit()
 
 
+def test_get_posts_url():
+    urls = db.get_posts_url(["1cx4mbl", "1dxpqvk"])
+    assert type(urls) == dict
+    assert len(urls) > 0
+    assert urls == {
+        "1cx4mbl": "/r/dataengineering/comments/1cx4mbl/do_you_guys_think_he_has_a_point/",
+        "1dxpqvk": "/r/dataengineering/comments/1dxpqvk/sales_of_vibrators_spike_every_august/",
+    }
+
+    # checks urls are returned in alphabetical order
+    urls = db.get_posts_url(["1dxpqvk", "1cx4mbl"])
+    assert type(urls) == dict
+    assert len(urls) > 0
+    assert urls == {
+        "1cx4mbl": "/r/dataengineering/comments/1cx4mbl/do_you_guys_think_he_has_a_point/",
+        "1dxpqvk": "/r/dataengineering/comments/1dxpqvk/sales_of_vibrators_spike_every_august/",
+    }
+
+
 def test_vector_search():
 
     rows = db.vector_search(
