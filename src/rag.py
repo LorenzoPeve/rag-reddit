@@ -185,7 +185,7 @@ class ThrottledOpenAI:
         for post_id, title, body in parsed_sources:
             prompt += f"Post ID: {post_id}\nTitle: {title}\nBody: {body}\n\n"
        
-        with open("prompt.txt", "w") as f:
+        with open("prompt.txt", "w", encoding='utf-8') as f:
             f.write(prompt)
 
         # Check prompt token limit
