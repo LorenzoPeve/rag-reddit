@@ -177,6 +177,26 @@
             padding: 0;
         }
 
+        .message.assistant-message a {
+    text-decoration: none;  /* Remove underline */
+    color: inherit;  /* Use parent text color */
+    background-color: rgba(88, 101, 242, 0.1);  /* Light accent color background */
+    padding: 2px 6px;  /* Add some padding around the text */
+    border-radius: 4px;  /* Rounded corners */
+    transition: background-color 0.2s ease;  /* Smooth hover effect */
+}
+
+.message.assistant-message a:hover {
+    background-color: rgba(88, 101, 242, 0.2);  /* Slightly darker on hover */
+}
+
+/* Style for citation numbers specifically */
+.message.assistant-message strong {
+    color: var(--accent-color);
+    font-weight: 600;
+    margin-right: 4px;  /* Add small gap after citation number */
+}
+
         .input-container {
             padding: 20px;
             background: var(--chat-bg);
@@ -505,7 +525,7 @@
             smartLists: true,
             renderer: {
                 link(href, title, text) {
-                    return `<a href="${href}" target="_blank" style="color: var(--accent-color); text-decoration: underline;">${text}</a>`;
+                    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="background-color: rgba(88, 101, 242, 0.1); padding: 2px 6px; border-radius: 4px; text-decoration: none; color: inherit;">${text}</a>`;
                 }
             }
         });
@@ -686,16 +706,15 @@
                 }
 
                 const data = await response.json();
-
                 let processedText = text;
 
                 // Replace each post ID with a hyperlink
                 Object.entries(data.urls).forEach(([postId, url]) => {
-                    const regex = new RegExp(`\\[\\[${postId}\\]\\]`, 'g');
-                    const fullUrl = `https://www.reddit.com${url}`; // Properly concatenate the URL
+                    const regex = new RegExp(`"([^"]+)"\\[\\[${postId}\\]\\]`, 'g');
+                    const fullUrl = `https://www.reddit.com${url}`;
                     processedText = processedText.replace(
                         regex,
-                        `[view post](${fullUrl})`  // Use Markdown link syntax instead of HTML
+                        `[$1](${fullUrl})`  // Make the title itself a Markdown link
                     );
                 });
 
