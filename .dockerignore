@@ -1,0 +1,25 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+wvenv/
+env/
+*.log
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Project specific
+_docs/
+etl/
+lambda_functions/
