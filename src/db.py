@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 import hashlib
 import logging
 import os
-import sqlalchemy
 from sqlalchemy import (
     Column,
     Integer,
@@ -92,11 +91,11 @@ def get_cursor():
         cur: The cursor object for executing SQL queries.
     """
     conn = psycopg.connect(
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("POSTGRES_NAME"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+        host=os.getenv("POSTGRES_HOST"),
+        port=os.getenv("POSTGRES_PORT"),
     )
     return conn.cursor()
 
