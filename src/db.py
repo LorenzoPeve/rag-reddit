@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 connection_string = (
-    f'postgresql+psycopg://{os.getenv("DB_USER")}:{os.getenv("DB_PASSWORD")}'
-    f'@{os.getenv("DB_HOST")}:{os.getenv("DB_PORT")}/{os.getenv("DB_NAME")}'
+    f'postgresql+psycopg://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}'
+    f'@{os.getenv("POSTGRES_HOST")}:{os.getenv("POSTGRES_PORT")}/{os.getenv("POSTGRES_DB")}'
 )
 engine = create_engine(connection_string, pool_size=20)
 llm_client = rag.ThrottledOpenAI()
