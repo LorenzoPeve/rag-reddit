@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 # Initialize OpenAI client
 llm_client = rag.ThrottledOpenAI()
 
-
 def error_handler(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -80,4 +79,4 @@ def find_post_urls() -> dict:
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run()
