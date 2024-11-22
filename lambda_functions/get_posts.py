@@ -96,4 +96,23 @@ def lambda_handler(event, context):
 
 
 if __name__ == "__main__":
-    print(lambda_handler({"t": "year", "iterations": 6, "n": 100}, None))
+    
+    # Default values
+    timeframe = "year"
+    iterations = 6
+    num_posts = 100
+
+    # Override with command line arguments if provided
+    if len(sys.argv) > 1:
+        timeframe = sys.argv[1]
+    if len(sys.argv) > 2:
+        iterations = int(sys.argv[2])
+    if len(sys.argv) > 3:
+        num_posts = int(sys.argv[3])
+
+    event = {
+        "t": timeframe,
+        "iterations": iterations,
+        "n": num_posts
+    }
+    print(lambda_handler(event, None))
