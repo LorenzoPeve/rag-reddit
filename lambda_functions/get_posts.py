@@ -115,4 +115,5 @@ if __name__ == "__main__":
         "iterations": iterations,
         "n": num_posts
     }
-    print(lambda_handler(event, None))
+    
+    lambda_handler(event, None)

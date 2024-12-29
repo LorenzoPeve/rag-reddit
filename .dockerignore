@@ -8,6 +8,7 @@ venv/
 wvenv/
 env/
 *.log
+.env*
 
 # Version control
 .git/

@@ -3,7 +3,10 @@
 https://github.com/reddit-archive/reddit/wiki/OAuth2
 
 
-## 
+# REDDIT RAG
+This repository implements a Retrieval-Augmented Generation (RAG) system that
+leverages the **r/dataengineering** subreddit as the knowledge base. Of course,
+because we cannot get enough of data engineering.
 
 Your username is: reddit_bot
 Your password is: snoo
@@ -35,14 +38,34 @@ Out[7]:
     u'token_type': u'bearer'}
 ```
 
-## Dev Environment
 
+## Development Environment
+### Build and start containers
 ```bash
-docker compose -p reddit_stack up -d --build
-docker compose -p reddit_stack down --volumes
-docker compose down --volumes
+docker compose -p reddit-rag-dev -f docker-compose.dev.yml up --build -d
 ```
 
+### Running init etl
+Run ETL to load about 200 posts from the subreddit `dataengineering` into the database.
+ 
+```bash
+docker exec -it flask-reddit-dev bash
+python etl/init_etl.py
+python lambda_functions/get_posts.py "all" 2 100
+```
+
+### Running tests
+```bash
+docker exec -it flask-reddit-dev bash
+pytest -s -vv tests
+```
+
+### Deleting containers
+```bash
+docker compose -p reddit-rag-dev down --volumes
+```
+## Environment variables
+See the `.env.template` file for the environment variables used in the application.
 
 ## Reddit API
 
@@ -62,7 +85,7 @@ Here is a list of the six different types of objects returned from Reddit:
 response = requests.get(
     "https://oauth.reddit.com/r/dataengineering/about",
     headers={
-        'Authorization': f"bearer {os.getenv('TOKEN')}",
+        'Authorization': f"bearer {token}",
         "User-Agent": os.getenv('USER_AGENT'),
     },
 )
@@ -134,19 +157,10 @@ These two endpoints are equivalent
 - Reddit's API prioritizes recent content, so after a certain point, very old posts may no longer be available via the API, especially for large subreddits. You can access only a limited timeframe of posts from the API due to the way data is stored and indexed.
 - For very old or archived posts, the API might not return them, even if you paginate through all the available content.
 
-#### Searching a subreddit
-
-### Tags  
-
+### Tags
 On Reddit, tags are labels used to categorize and organize posts within a subreddit. They help users quickly identify the type of content or the topic of the post.
 
 Below are the tags for the data engineering subreddit. To increase data quality
 those post tagged as `Meme` are not included in the dataset.
 
 ![alt text](_docs/tags.png)
-
-
-### 💡 Future Work
-
-💡 What about focusing on different 
-
