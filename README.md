@@ -1,71 +1,51 @@
- https://www.reddit.com/prefs/apps
-
-https://github.com/reddit-archive/reddit/wiki/OAuth2
-
-
-# REDDIT RAG
-This repository implements a Retrieval-Augmented Generation (RAG) system that
-leverages the **r/dataengineering** subreddit as the knowledge base. Of course,
-because we cannot get enough of data engineering.
-
-Your username is: reddit_bot
-Your password is: snoo
-Your app's client ID is: p-jcoLKBynTLew
-Your app's client secret is: gko_LXELoV07ZBNUXrvWZfzE3aI
-
-```
-reddit@reddit-VirtualBox:~$ curl -X POST -d 'grant_type=password&username=reddit_bot&password=snoo' --user 'p-jcoLKBynTLew:gko_LXELoV07ZBNUXrvWZfzE3aI' https://www.reddit.com/api/v1/access_token
-{
-    "access_token": "J1qK1c18UUGJFAzz9xnH56584l4", 
-    "expires_in": 3600, 
-    "scope": "*", 
-    "token_type": "bearer"
-}
-```
-
-```
-In [1]: import requests
-In [2]: import requests.auth
-In [3]: client_auth = requests.auth.HTTPBasicAuth('p-jcoLKBynTLew', 'gko_LXELoV07ZBNUXrvWZfzE3aI')
-In [4]: post_data = {"grant_type": "password", "username": "reddit_bot", "password": "snoo"}
-In [5]: headers = {"User-Agent": "ChangeMeClient/0.1 by YourUsername"}
-In [6]: response = requests.post("https://www.reddit.com/api/v1/access_token", auth=client_auth, data=post_data, headers=headers)
-In [7]: response.json()
-Out[7]: 
-    {u'access_token': u'fhTdafZI-0ClEzzYORfBSCR7x3M',
-    u'expires_in': 3600,
-    u'scope': u'*',
-    u'token_type': u'bearer'}
-```
-
-
-## Development Environment
-### Build and start containers
+## Dev Environment
 ```bash
-docker compose -p reddit-rag-dev -f docker-compose.dev.yml up --build -d
+docker compose -p reddit_stack up -d --build
+docker compose -p reddit_stack down --volumes
+docker compose down --volumes
 ```
 
-### Running init etl
-Run ETL to load about 200 posts from the subreddit `dataengineering` into the database.
- 
+## Production Environment
+My VM IP address is `165.227.120.80`. To follow along, you can create a VM on Digital Ocean or any other cloud provider and replace the IP address with your own.
+
+### Create SSH Key
 ```bash
-docker exec -it flask-reddit-dev bash
-python etl/init_etl.py
-python lambda_functions/get_posts.py "all" 2 100
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+ssh-copy-id root@165.227.120.80
 ```
 
-### Running tests
+### Create project directory in home
 ```bash
-docker exec -it flask-reddit-dev bash
-pytest -s -vv tests
+cd /home
+mkdir rag-reddit
+cd rag-reddit
 ```
 
-### Deleting containers
+### Set up Docker containers the project
+#### Transfer files to the VM
 ```bash
-docker compose -p reddit-rag-dev down --volumes
+scp -r ./docker root@165.227.120.80:/home/rag-reddit/docker
+scp .env.prod root@165.227.120.80:/home/rag-reddit
 ```
-## Environment variables
-See the `.env.template` file for the environment variables used in the application.
+
+### Initialize containers
+```bash
+ssh root@165.227.120.80
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+cd docker
+docker compose -f docker-compose.prod.yml -p rag-reddit up -d
+docker compose -f docker-compose.prod.yml -p rag-reddit start
+```
+
+
+## Ingestion Pipeline
+AWS Lambda functions are used to ingest reddit posts and build the knowledge base in the RAG system.
+Reddit are retrieved with the specified frequencies:
+- 30 *Best monthly posts* are retrieved daily at 10:00 AM `{"iterations": 1, "n": 30, "t": "month"}`
+- 600 *Best yearly posts* are retrieved every Friday at 08:00 AM `{"iterations": 6, "n": 100, "t": "year"}`
+- 1000 *Best all-time posts* are retrieved every Friday at 06:30 AM `{"iterations": 10, "n": 100, "t": "all"}`
+
 
 ## Reddit API
 
@@ -85,7 +65,7 @@ Here is a list of the six different types of objects returned from Reddit:
 response = requests.get(
     "https://oauth.reddit.com/r/dataengineering/about",
     headers={
-        'Authorization': f"bearer {token}",
+        'Authorization': f"bearer {os.getenv('TOKEN')}",
         "User-Agent": os.getenv('USER_AGENT'),
     },
 )
@@ -157,10 +137,12 @@ These two endpoints are equivalent
 - Reddit's API prioritizes recent content, so after a certain point, very old posts may no longer be available via the API, especially for large subreddits. You can access only a limited timeframe of posts from the API due to the way data is stored and indexed.
 - For very old or archived posts, the API might not return them, even if you paginate through all the available content.
 
-### Tags
+#### Searching a subreddit
+
+### Tags  
+
 On Reddit, tags are labels used to categorize and organize posts within a subreddit. They help users quickly identify the type of content or the topic of the post.
 
-Below are the tags for the data engineering subreddit. To increase data quality
-those post tagged as `Meme` are not included in the dataset.
+Below are the tags for the data engineering subreddit. **To increase data quality those post tagged as `Meme` are not included in the dataset.**
 
 ![alt text](_docs/tags.png)
