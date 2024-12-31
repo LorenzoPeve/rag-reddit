@@ -1,10 +1,10 @@
 ## Dev Environment
-Create `.env.dev` file in the root directory and add the environment variables included in the `.env.template` file.
+Create `.env` file in the root directory and add the environment variables included in the `.env.template` file.
 
 ```bash
-docker compose -p reddit_stack up -d --build
+docker compose -f docker-compose.dev.yml -p reddit_stack up -d --build
+docker compose -p reddit_stack start
 docker compose -p reddit_stack down --volumes
-docker compose down --volumes
 ```
 
 ## Production Environment
@@ -29,6 +29,10 @@ cd rag-reddit
 ```bash
 scp -r ./docker root@165.227.120.80:/home/rag-reddit/docker
 scp .env.prod root@165.227.120.80:/home/rag-reddit
+
+# Or use rsync instead of scp, which handles overwrites better:
+rsync -av --delete ./docker/ root@165.227.120.80:/home/rag-reddit/docker
+rsync -av .env.prod root@165.227.120.80:/home/rag-reddit/
 ```
 
 #### Initialize containers
@@ -36,9 +40,10 @@ scp .env.prod root@165.227.120.80:/home/rag-reddit
 ssh root@165.227.120.80
 docker stop $(docker ps -a -q)
 docker rm $(docker ps -a -q)
-cd docker
+cd /home/rag-reddit/docker
 docker compose -f docker-compose.prod.yml -p rag-reddit up -d
 docker compose -f docker-compose.prod.yml -p rag-reddit start
+docker compose -p rag-reddit down --volumes
 ```
 
 
