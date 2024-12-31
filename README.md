@@ -40,12 +40,20 @@ rsync -av .env.prod root@165.227.120.80:/home/rag-reddit/
 ssh root@165.227.120.80
 docker stop $(docker ps -a -q)
 docker rm $(docker ps -a -q)
+docker volume rm $(docker volume ls -q)
 cd /home/rag-reddit/docker
-docker compose -f docker-compose.prod.yml -p rag-reddit up -d
+docker compose -f docker-compose.prod.yml -p rag-reddit up -d --build
 docker compose -f docker-compose.prod.yml -p rag-reddit start
 docker compose -p rag-reddit down --volumes
 ```
 
+##### Check Postgres initialize correctly
+After running this commands you should see two tables `documents` and `posts` in the database.
+```bash
+docker exec -it postgres-reddit bash
+psql -U <your_root_user> -d <your_db_name>
+\dt
+```
 
 ## Ingestion Pipeline
 AWS Lambda functions are used to ingest reddit posts and build the knowledge base in the RAG system.
