@@ -1,4 +1,6 @@
 ## Dev Environment
+Create `.env.dev` file in the root directory and add the environment variables included in the `.env.template` file.
+
 ```bash
 docker compose -p reddit_stack up -d --build
 docker compose -p reddit_stack down --volumes
@@ -14,8 +16,9 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 ssh-copy-id root@165.227.120.80
 ```
 
-### Create project directory in home
+### Create project directory in `home`
 ```bash
+ssh root@165.227.120.80
 cd /home
 mkdir rag-reddit
 cd rag-reddit
@@ -28,7 +31,7 @@ scp -r ./docker root@165.227.120.80:/home/rag-reddit/docker
 scp .env.prod root@165.227.120.80:/home/rag-reddit
 ```
 
-### Initialize containers
+#### Initialize containers
 ```bash
 ssh root@165.227.120.80
 docker stop $(docker ps -a -q)
