@@ -82,7 +82,7 @@ def lambda_handler(event, context):
     retrieved = 0
     after = None
     for i in range(iterations):
-        print(f"Fetching top posts from r/dataengineering {i}")
+        print(f"Fetching top posts from r/dataengineering. Iteration {i+1}.")
         posts = reddit.get_top_posts("dataengineering", limit=n, t=t, after=after)
         after = "t3_" + posts[-1]["id"]
         insert_reddit_posts(posts)
