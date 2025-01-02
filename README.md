@@ -32,7 +32,7 @@ scp .env.prod root@165.227.120.80:/home/rag-reddit
 
 # Or use rsync instead of scp, which handles overwrites better:
 rsync -av --delete ./docker/ root@165.227.120.80:/home/rag-reddit/docker
-rsync -av .env.prod root@165.227.120.80:/home/rag-reddit/
+rsync -av --delete .env.prod root@165.227.120.80:/home/rag-reddit/
 ```
 
 #### Initialize containers
