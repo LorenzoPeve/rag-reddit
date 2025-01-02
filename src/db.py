@@ -91,7 +91,7 @@ def get_cursor():
         cur: The cursor object for executing SQL queries.
     """
     conn = psycopg.connect(
-        dbname=os.getenv("POSTGRES_NAME"),
+        dbname=os.getenv("POSTGRES_DB"),
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
         host=os.getenv("POSTGRES_HOST"),
