@@ -62,6 +62,35 @@ Reddit are retrieved with the specified frequencies:
 - 600 *Best yearly posts* are retrieved every Friday at 08:00 AM `{"iterations": 6, "n": 100, "t": "year"}`
 - 1000 *Best all-time posts* are retrieved every Friday at 06:30 AM `{"iterations": 10, "n": 100, "t": "all"}`
 
+### Set up the environment for a Lambda function
+For Lambda layers, the path structure needs to match what Lambda expects [docs](https://docs.aws.amazon.com/lambda/latest/dg/python-layers.html).
+
+To ensure that the PATH variable picks up your layer content, your layer .zip file should have its dependencies in the following folder paths:
+- `python`
+- `python/lib/python3.x/site-packages`
+For example, the resulting layer .zip file that you create in this tutorial has the following directory structure:
+```
+layer_content.zip
+└ python
+    └ lib
+        └ python3.11
+            └ site-packages
+                └ requests
+                └ <other_dependencies> (i.e. dependencies of the requests package)
+                └ ...
+```
+
+```
+# Create the correct directory structure first
+mkdir -p python/lib/python3.11/site-packages
+cp -r venv/lib/python3.11/site-packages/* python/lib/python3.11/site-packages/
+
+# Create zip with the correct structure
+zip -r function.zip lambda_function.py python/
+
+# Create the layer zip with the correct structure
+zip -r layer.zip python/
+```
 
 ## Reddit API
 
