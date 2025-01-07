@@ -16,7 +16,7 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     env_file:
-      - ./.env
+      - ../.env
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db_scripts:/docker-entrypoint-initdb.d
