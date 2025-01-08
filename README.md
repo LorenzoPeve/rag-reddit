@@ -81,16 +81,20 @@ layer_content.zip
                 └ ...
 ```
 
-```
-# Create the correct directory structure first
-mkdir -p python/lib/python3.11/site-packages
-cp -r venv/lib/python3.11/site-packages/* python/lib/python3.11/site-packages/
+Approach here is to create a virtual environment, install the dependencies, and then copy the dependencies to a `zip` file.
 
-# Create zip with the correct structure
-zip -r function.zip lambda_function.py python/
+**Python packages that contain compiled code, such as NumPy and pandas, aren't always compatible with Lambda runtimes by default.** See [docs](https://repost.aws/knowledge-center/lambda-python-package-compatible) for more information. Run the command below to ensure the correct Linux-compatible versions of the dependencies.
 
-# Create the layer zip with the correct structure
-zip -r layer.zip python/
+```bash
+https://repost.aws/knowledge-center/lambda-python-package-compatible
+
+```bash
+pip install --target venv/lib/python3.11/site-packages \
+    --platform manylinux2014_x86_64 \
+    --implementation cp \
+    --python-version 3.11 \
+    --only-binary=:all: \
+    --upgrade -r requirements.txt
 ```
 
 ## Reddit API
