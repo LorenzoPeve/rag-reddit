@@ -1,6 +1,10 @@
+import json
+import os
 from sqlalchemy.sql import text
 
 from src import db
+
+OUTPUT_DIR =  os.path.join(os.path.dirname(__file__), "output")
 
 def test_database_connection():
     """Test if we can connect to the database and perform a simple query."""
@@ -12,9 +16,8 @@ def test_database_connection():
         raise Exception("Database connection failed")
 
 
-
 def test_insert_reddit_post():
-
+    """Test if we can insert a Reddit post into the database."""
     try:
         db.insert_reddit_post(
             {
@@ -79,8 +82,12 @@ def test_vector_search():
     ids = [r[0] for r in rows]
 
     with db.Session(db.engine) as session:
-        posts = session.query(db.Documents).filter(db.Documents.id.in_(ids)).all()
+        posts = session.query(db.Documents).filter(
+            db.Documents.id.in_(ids)).all()
         assert len(posts) == 5
+
+    with open(os.path.join(OUTPUT_DIR, "vector_search.json"), "w") as f:
+        json.dump(rows, f, indent=4)
 
 
 def test_keyword_search():
@@ -90,6 +97,8 @@ def test_keyword_search():
     assert len(rows[0]) == 2
     assert type(rows[0][1]) == int
 
+    with open(os.path.join(OUTPUT_DIR, "keyword_search.json"), "w") as f:
+        json.dump(rows, f, indent=4)
 
 def test_keyword_search_match_all():
     query = "What are key features of argentina with snowflake"
@@ -106,7 +115,8 @@ def test_keyword_search_match_all():
 
 def test_hybrid_search():
 
-    rows = db.hybrid_search("What are key features of a snowflake Argentina", limit=5)
+    rows = db.hybrid_search(
+        "What are key features of a snowflake Argentina", limit=5)
 
     assert type(rows) == list
     assert len(rows) == 5  # 5 rows
@@ -130,8 +140,8 @@ def test_hybrid_search():
 
 
 def test_is_post_modified():
-    result = db.is_post_modified("1fwv29o")
-    assert result == True
+    result = db.is_post_modified("1aieu3j")
+    assert result == False
 
 
 def test_get_posts_without_documents():
