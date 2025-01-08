@@ -1,7 +1,9 @@
 import json
+import os
 
 from src import reddit
 
+OUTPUT_DIR =  os.path.join(os.path.dirname(__file__), "output")
 
 def test_get_auth_token():
 
@@ -58,7 +60,8 @@ def test_posts_and_comments():
         comments = reddit.get_all_comments_in_post(post["id"])
         assert isinstance(comments, str)
         assert len(comments) > 0
-        out.append({"post": post["permalink"], "comments": comments})
+        post["comments"] = comments
+        out.append(post)
 
-    with open("posts_and_comments2.json", "w") as f:
+    with open(os.path.join(OUTPUT_DIR, "reddit_posts.json"), "w") as f:
         json.dump(out, f, indent=4)
