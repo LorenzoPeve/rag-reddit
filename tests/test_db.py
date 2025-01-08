@@ -1,4 +1,16 @@
+from sqlalchemy.sql import text
+
 from src import db
+
+def test_database_connection():
+    """Test if we can connect to the database and perform a simple query."""
+    try:
+        with db.engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            assert result.scalar() == 1
+    except Exception as e:
+        raise Exception("Database connection failed")
+
 
 
 def test_insert_reddit_post():
