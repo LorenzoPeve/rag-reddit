@@ -1,11 +1,12 @@
 ## Dev Environment
 Create `.env` file in the root directory and add the environment variables included in the `.env.template` file.
 
-```bash
-docker compose -f docker-compose.dev.yml -p reddit_stack up -d --build
-docker compose -p reddit_stack start
-docker compose -p reddit_stack down --volumes
-```
+### Set up the environment with VSCode Dev Container
+- Install the Remote - Containers extension in VSCode
+- Open the project in VSCode
+- Click on the green icon in the bottom left corner
+- Select `Reopen in Container`
+- Initialize db `python etl/init_etl.py`
 
 ## Production Environment
 My VM IP address is `165.227.120.80`. To follow along, you can create a VM on Digital Ocean or any other cloud provider and replace the IP address with your own.
