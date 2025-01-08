@@ -76,10 +76,7 @@ def get_top_posts(subreddit: str, limit: int = 100, t: str = "month", after: str
 
 
 def get_post_from_id(post_id: str) -> dict:
-    """
-    Fetches a Reddit post using the post's unique identifier. Returns a
-    `RedditPosts` object.
-    """
+    """Fetches a Reddit post using the post's unique identifier."""
     r = REDDIT.submission(id=post_id)
     return dict(
         id=post_id,
