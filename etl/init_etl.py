@@ -17,7 +17,8 @@ def get_posts(n: int):
             continue
         comments = reddit.get_all_comments_in_post(post["id"])
         p['comments'] = comments
-        p['content_hash'] = db.get_content_hash(p["title"], p["description"], comments)
+        p['content_hash'] = db.get_content_hash(
+            p["title"], p["description"], comments)
         out.append(p)
     return out
 
