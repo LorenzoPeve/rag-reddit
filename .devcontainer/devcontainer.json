@@ -3,25 +3,28 @@
     "dockerComposeFile": "docker-compose.yml",
     "service": "python",
     "workspaceFolder": "/workspace",
-    
-    // Configure tool-specific properties
     "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-python.python",
-                "ms-python.vscode-pylance",
-                "ms-python.black-formatter"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
-                "python.linting.enabled": true,
-                "python.formatting.provider": "black"
-            }
+      "vscode": {
+        "extensions": [
+          "ms-python.python",
+          "ms-python.vscode-pylance",
+          "ms-python.black-formatter",
+          "pamaron.vscode-vertical-ruler", // Add vertical rulers/grid lines
+          "PeterJausovec.vscode-docker"    // Optional: helpful for Docker development
+        ],
+        "settings": {
+          "python.defaultInterpreterPath": "/usr/local/bin/python",
+          "python.linting.enabled": true,
+          "python.formatting.provider": "black",
+          // Grid line settings
+          "editor.rulers": [80, 100],          // Shows vertical lines at column 80 and 100
+          "workbench.colorCustomizations": {
+            "editorRuler.foreground": "#ff4081" // Customize grid line color (optional)
+          }
         }
+      }
     },
-
-    // Features to add to the dev container. More info: https://containers.dev/features
     "features": {
-        "ghcr.io/devcontainers/features/git:1": {}
+      "ghcr.io/devcontainers/features/git:1": {}
     }
-}
+  }
