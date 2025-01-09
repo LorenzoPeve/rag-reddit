@@ -1,7 +1,6 @@
 FROM python:3.11.3-slim-buster
 
-# set work directory
-WORKDIR /usr/src/app
+WORKDIR /workspace
 
 # set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -12,5 +11,5 @@ RUN apt-get update && apt-get install
 
 # install dependencies
 RUN pip install --upgrade pip
-COPY ./requirements.txt /usr/src/app/requirements.txt
+COPY requirements.txt /workspace/requirements.txt
 RUN pip install -r requirements.txt

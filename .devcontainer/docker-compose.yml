@@ -1,13 +1,18 @@
 services:
-  python:
-    container_name: python-dev
-    image: mcr.microsoft.com/devcontainers/python:3.11
+  web:
+    container_name: flask-reddit-dev
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.dev
+    command: gunicorn --bind 0.0.0.0:5000 --reload wsgi:app
+    ports:
+      - 5000:5000
+    env_file:
+      - ../.env
+    depends_on:
+      - db
     volumes:
       - ../:/workspace:cached
-    working_dir: /workspace
-    command: /bin/bash -c "pip install --upgrade pip && pip install -r requirements.txt && sleep infinity"
-    environment:
-      - PYTHONUNBUFFERED=1
     networks:
       - reddit-network-dev
 

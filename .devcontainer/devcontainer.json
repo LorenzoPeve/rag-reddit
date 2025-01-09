@@ -1,7 +1,7 @@
 {
     "name": "Python Dev Environment",
     "dockerComposeFile": "docker-compose.yml",
-    "service": "python",
+    "service": "web",
     "workspaceFolder": "/workspace",
     "customizations": {
       "vscode": {
