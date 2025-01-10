@@ -7,6 +7,7 @@ Create `.env` file in the root directory and add the environment variables inclu
 - Click on the green icon in the bottom left corner
 - Select `Reopen in Container`
 - Initialize db `python etl/init_etl.py`
+- Start development server `flask run --debug --host=0.0.0.0 --port=8000`
 
 ## Production Environment
 My VM IP address is `165.227.120.80`. To follow along, you can create a VM on Digital Ocean or any other cloud provider and replace the IP address with your own.
