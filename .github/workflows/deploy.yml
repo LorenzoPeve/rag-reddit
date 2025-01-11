@@ -21,6 +21,9 @@ jobs:
           git clone https://github.com/LorenzoPeve/rag-reddit.git /app
           cd /app
 
+          # Stop existing containers
+          docker compose -f docker/docker-compose.prod.yml -p rag-reddit down
+
           # Create .env file from GitHub secrets
           cat > .env.prod << EOL
           REDDIT_USER=${{ secrets.REDDIT_USER }}
@@ -40,3 +43,6 @@ jobs:
           CHUNK_SIZE=1200
           CHUNK_OVERLAP=120
           EOL
+
+          # Build and start containers with the new env file
+          docker compose -f docker/docker-compose.prod.yml -p rag-reddit up -d --build
