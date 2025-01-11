@@ -34,4 +34,3 @@ networks:
 
 volumes:
   postgres-data:
-    name: reddit_stack_postgres-data-dev
