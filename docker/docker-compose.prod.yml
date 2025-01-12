@@ -35,4 +35,4 @@ networks:
 
 volumes:
   postgres-data:
-    name: rag-reddit-postgres-data
+    name: rag-reddit_postgres-data
