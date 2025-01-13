@@ -37,7 +37,7 @@ jobs:
             export POSTGRES_DB='${{ secrets.POSTGRES_DB }}'
             export POSTGRES_USER='${{ secrets.POSTGRES_USER }}'
             export POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}'
-            export POSTGRES_HOST='postgres'
+            export POSTGRES_HOST='${{ secrets.POSTGRES_HOST }}'
             export POSTGRES_PORT='${{ secrets.POSTGRES_PORT }}'
             export OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}'
             export OPENAI_ENCODER='cl100k_base'
@@ -48,3 +48,9 @@ jobs:
             
             # Start containers using exported variables
             docker compose -f docker/docker-compose.prod.yml -p rag-reddit up -d --build
+
+            # Wait for containers to be ready
+            sleep 10
+            
+            # Run database connection test
+            docker exec gunicorn pytest -s -vv tests/test_db::test_database_connection
