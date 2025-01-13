@@ -28,21 +28,23 @@ jobs:
             # Stop existing containers
             docker compose -f docker/docker-compose.prod.yml -p rag-reddit down
             
-            # Start containers with environment variables passed directly
-            REDDIT_USER=${{ secrets.REDDIT_USER }} \
-            REDDIT_USER_PASSWORD=${{ secrets.REDDIT_USER_PASSWORD }} \
-            REDDIT_CLIENT_ID=${{ secrets.REDDIT_CLIENT_ID }} \
-            REDDIT_CLIENT_SECRET=${{ secrets.REDDIT_CLIENT_SECRET }} \
-            USER_AGENT=${{ secrets.USER_AGENT }} \
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }} \
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
-            POSTGRES_HOST=${{ secrets.POSTGRES_HOST }} \
-            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }} \
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-            OPENAI_ENCODER=cl100k_base \
-            OPENAI_EMBEDDING_MODEL=text-embedding-3-small \
-            OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT=8191 \
-            CHUNK_SIZE=1200 \
-            CHUNK_OVERLAP=120 \
+            # Export variables to avoid shell escaping issues
+            export REDDIT_USER='${{ secrets.REDDIT_USER }}'
+            export REDDIT_USER_PASSWORD='${{ secrets.REDDIT_USER_PASSWORD }}'
+            export REDDIT_CLIENT_ID='${{ secrets.REDDIT_CLIENT_ID }}'
+            export REDDIT_CLIENT_SECRET='${{ secrets.REDDIT_CLIENT_SECRET }}'
+            export USER_AGENT='${{ secrets.USER_AGENT }}'
+            export POSTGRES_DB='${{ secrets.POSTGRES_DB }}'
+            export POSTGRES_USER='${{ secrets.POSTGRES_USER }}'
+            export POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}'
+            export POSTGRES_HOST='postgres'
+            export POSTGRES_PORT='${{ secrets.POSTGRES_PORT }}'
+            export OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}'
+            export OPENAI_ENCODER='cl100k_base'
+            export OPENAI_EMBEDDING_MODEL='text-embedding-3-small'
+            export OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT='8191'
+            export CHUNK_SIZE='1200'
+            export CHUNK_OVERLAP='120'
+            
+            # Start containers using exported variables
             docker compose -f docker/docker-compose.prod.yml -p rag-reddit up -d --build
