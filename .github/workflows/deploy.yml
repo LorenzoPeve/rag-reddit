@@ -53,4 +53,4 @@ jobs:
             sleep 10
             
             # Run database connection test
-            docker exec gunicorn pytest -s -vv tests/test_db::test_database_connection
+            docker exec gunicorn pytest -s -vv /app/tests/test_db.py::test_database_connection
