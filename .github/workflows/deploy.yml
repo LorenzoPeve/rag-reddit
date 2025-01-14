@@ -14,6 +14,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set lowercase repository variables
+        run: |
+          echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo "OWNER_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+          echo "NAME_LOWER=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+          echo "${NAME_LOWER,,}" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -24,17 +31,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Flask app image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/Dockerfile.prod
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
+          tags: ghcr.io/${{ env.REPO_LOWER }}/app:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Copy docker-compose and other necessary files
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker/docker-compose.prod.yml,docker/init.sql"
+          target: "/app"
+          strip_components: 1
 
       - name: Deploy to production server
         uses: appleboy/ssh-action@master
@@ -47,31 +64,8 @@ jobs:
             mkdir -p /app
             cd /app
 
-            # Create or update docker-compose.yml
-            cat > docker-compose.prod.yml <<'EOL'
-            version: '3.8'
-            services:
-              app:
-                image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
-                restart: always
-                environment:
-                  - REDDIT_USER=${REDDIT_USER}
-                  - REDDIT_USER_PASSWORD=${REDDIT_USER_PASSWORD}
-                  - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
-                  - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
-                  - USER_AGENT=${USER_AGENT}
-                  - POSTGRES_DB=${POSTGRES_DB}
-                  - POSTGRES_USER=${POSTGRES_USER}
-                  - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-                  - POSTGRES_HOST=${POSTGRES_HOST}
-                  - POSTGRES_PORT=${POSTGRES_PORT}
-                  - OPENAI_API_KEY=${OPENAI_API_KEY}
-                  - OPENAI_ENCODER=${OPENAI_ENCODER}
-                  - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL}
-                  - OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT=${OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT}
-                  - CHUNK_SIZE=${CHUNK_SIZE}
-                  - CHUNK_OVERLAP=${CHUNK_OVERLAP}
-            EOL
+            # Update the docker-compose file to use the built image
+            sed -i 's|build: .*|image: ghcr.io/${{ env.REPO_LOWER }}/app:latest|g' docker-compose.prod.yml
 
             # Export environment variables
             export REDDIT_USER='${{ secrets.REDDIT_USER }}'
@@ -94,7 +88,7 @@ jobs:
             # Login to GitHub Container Registry
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Pull latest image and restart containers
+            # Pull latest images and restart containers
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
 
