@@ -28,9 +28,11 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile
+          file: docker/Dockerfile.prod
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -50,7 +52,7 @@ jobs:
             version: '3.8'
             services:
               app:
-                image: ghcr.io/${{ github.repository }}:latest
+                image: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
                 restart: always
                 environment:
                   - REDDIT_USER=${REDDIT_USER}
