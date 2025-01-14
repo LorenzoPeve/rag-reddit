@@ -1,13 +1,39 @@
 name: Deploy Flask App
+
 on:
   push:
     branches:
       - main
+
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment: production
+    
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.prod
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Deploy to production server
         uses: appleboy/ssh-action@master
         with:
@@ -15,20 +41,37 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            if [ -d "/app" ]; then
-              cd /app
-              git fetch origin main
-              git reset --hard origin/main
-            else
-              mkdir -p /app
-              git clone https://github.com/LorenzoPeve/rag-reddit.git /app
-              cd /app
-            fi
-            
-            # Stop existing containers
-            docker compose -f docker/docker-compose.prod.yml -p rag-reddit down
-            
-            # Export variables to avoid shell escaping issues
+            # Create app directory if it doesn't exist
+            mkdir -p /app
+            cd /app
+
+            # Create or update docker-compose.yml
+            cat > docker-compose.prod.yml <<'EOL'
+            version: '3.8'
+            services:
+              app:
+                image: ghcr.io/${{ github.repository }}:latest
+                restart: always
+                environment:
+                  - REDDIT_USER=${REDDIT_USER}
+                  - REDDIT_USER_PASSWORD=${REDDIT_USER_PASSWORD}
+                  - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+                  - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+                  - USER_AGENT=${USER_AGENT}
+                  - POSTGRES_DB=${POSTGRES_DB}
+                  - POSTGRES_USER=${POSTGRES_USER}
+                  - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+                  - POSTGRES_HOST=${POSTGRES_HOST}
+                  - POSTGRES_PORT=${POSTGRES_PORT}
+                  - OPENAI_API_KEY=${OPENAI_API_KEY}
+                  - OPENAI_ENCODER=${OPENAI_ENCODER}
+                  - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL}
+                  - OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT=${OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT}
+                  - CHUNK_SIZE=${CHUNK_SIZE}
+                  - CHUNK_OVERLAP=${CHUNK_OVERLAP}
+            EOL
+
+            # Export environment variables
             export REDDIT_USER='${{ secrets.REDDIT_USER }}'
             export REDDIT_USER_PASSWORD='${{ secrets.REDDIT_USER_PASSWORD }}'
             export REDDIT_CLIENT_ID='${{ secrets.REDDIT_CLIENT_ID }}'
@@ -45,12 +88,16 @@ jobs:
             export OPENAI_EMBEDDING_MODEL_TOKEN_LIMIT='8191'
             export CHUNK_SIZE='1200'
             export CHUNK_OVERLAP='120'
-            
-            # Start containers using exported variables
-            docker compose -f docker/docker-compose.prod.yml -p rag-reddit up -d --build
+
+            # Login to GitHub Container Registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest image and restart containers
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
 
             # Wait for containers to be ready
             sleep 10
-            
+
             # Run database connection test
-            docker exec gunicorn pytest -s -vv /app/tests/test_db.py::test_database_connection
+            docker compose -f docker-compose.prod.yml exec -T app pytest -s -vv /app/tests/test_db.py::test_database_connection
